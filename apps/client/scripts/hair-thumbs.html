@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- Dev page driven by hair-thumbs.mjs: renders each character's head as a hairstyle thumbnail. -->
+<meta charset="utf-8" />
+<script type="module">
+  import { AmbientLight, Box3, DirectionalLight, Mesh, PerspectiveCamera, Scene, Vector3, WebGLRenderer } from "three";
+  import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+  import { CHARACTERS, DEFAULT_APPEARANCE } from "@hangout/shared";
+  import { modelUrl } from "/src/world/character/catalog.ts";
+  import { addFace, removeFaceInk } from "/src/world/character/face.ts";
+
+  const SIZE = 128;
+  const renderer = new WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  renderer.setSize(SIZE, SIZE);
+  renderer.setClearColor(0, 0);
+  document.body.append(renderer.domElement);
+
+  const scene = new Scene();
+  scene.add(new AmbientLight(0xffffff, 1.6));
+  const sun = new DirectionalLight(0xffffff, 2.4);
+  sun.position.set(1, 2, 3);
+  scene.add(sun);
+  const camera = new PerspectiveCamera(24, 1, 0.01, 10);
+
+  window.renderThumbs = async () => {
+    const loader = new GLTFLoader();
+    const out = {};
+    for (const id of CHARACTERS) {
+      const { scene: model } = await loader.loadAsync(modelUrl(id));
+      removeFaceInk(model);
+      let head = null;
+      model.traverse((o) => {
+        if (!o.isMesh) return;
+        if (o.name === "head-mesh") head = o;
+        else o.visible = false;
+      });
+      addFace(model, { ...DEFAULT_APPEARANCE, character: id, hairstyle: id }, head.material);
+      scene.add(model);
+      model.updateMatrixWorld(true);
+
+      // Frame the head (hair included) from the front, a little from above and to the side.
+      const box = new Box3().setFromObject(head, true);
+      const center = box.getCenter(new Vector3());
+      const radius = box.getSize(new Vector3()).length() / 2;
+      const dist = radius / Math.sin((camera.fov * Math.PI) / 360);
+      camera.position.copy(center).add(new Vector3(0.35, 0.3, 1).normalize().multiplyScalar(dist));
+      camera.lookAt(center);
+
+      renderer.render(scene, camera);
+      out[id] = renderer.domElement.toDataURL("image/png");
+      scene.remove(model);
+    }
+    return out;
+  };
+  window.thumbsReady = true;
+</script>

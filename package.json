@@ -1,0 +1,15 @@
+{
+  "name": "playground",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "e2e:characters": "node scripts/e2e/characters.mjs",
+    "e2e:recolor": "node scripts/e2e/recolor-all.mjs",
+    "e2e:perf": "node scripts/e2e/perf.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.64.1"
+  }
+}

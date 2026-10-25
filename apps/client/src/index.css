@@ -1,0 +1,414 @@
+:root {
+  --bg: #0f1724;
+  --panel: rgba(15, 23, 36, 0.72);
+  --text: #f3f6fb;
+  --muted: #a9b4c4;
+  --accent: #4f8cff;
+  --warn: #ff6b6b;
+  --speaking: #5ccf8a;
+  --radius: 12px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { margin: 0; height: 100%; overflow: hidden; background: var(--bg); }
+button, input { font: inherit; color: inherit; }
+
+.canvas { position: fixed !important; inset: 0; touch-action: none; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.85em; }
+.error { color: var(--warn); }
+
+/* Join screen: the live camp (ui/HomeScene.tsx) fills the screen; the menu is a HUD-style panel on the left,
+   the character stands in the free area to its right (the "stage"), which the camera centers on. */
+.home { height: 100%; }
+.home-ui {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 400px) 1fr;
+  gap: 16px;
+  padding: 16px;
+  pointer-events: none;
+}
+.home.customize .home-ui { grid-template-columns: minmax(0, 460px) 1fr; }
+.home-ui > * { pointer-events: auto; }
+/* The menu is a wooden sign in the world's colors: plank brown, grass-green buttons, cream text. */
+.home, .loading {
+  --wood: #8b5a3c;
+  --wood-light: #a8714c;
+  --wood-dark: #4a2f1f;
+  --grass: #3f9a5f;
+  --grass-dark: #275e3b;
+  --dirt: #c9693f;
+  --dirt-dark: #8a4527;
+  --cream: #fff4e0;
+  --accent: var(--grass);
+  --text: var(--cream);
+  --muted: #f0d6b8;
+}
+.home-panel {
+  position: relative;
+  align-self: center;
+  max-height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 26px 24px 24px;
+  border-radius: 18px;
+  border: 3px solid var(--wood-dark);
+  /* Faint plank seams over a top-lit wood gradient. */
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 46px, rgba(74, 47, 31, 0.35) 46px 48px),
+    linear-gradient(to bottom, var(--wood-light), var(--wood));
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.18), 0 6px 0 var(--wood-dark), 0 14px 30px rgba(0, 0, 0, 0.35);
+  color: var(--cream);
+  animation: panel-in 0.3s ease-out;
+}
+/* Nail heads in the top corners. */
+.home-panel::before, .home-panel::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #e3c9a6, #6b4a33);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+.home-panel::before { left: 10px; }
+.home-panel::after { right: 10px; }
+.home-panel .primary, .home-panel .secondary {
+  padding: 12px;
+  border: 2px solid var(--wood-dark);
+  border-radius: 12px;
+  font-family: "Lilita One", system-ui, sans-serif;
+  font-size: 1.15em;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.08s, box-shadow 0.08s, filter 0.15s;
+}
+.home-panel .primary { background: linear-gradient(to bottom, #56b072, var(--grass)); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 4px 0 var(--grass-dark); }
+.home-panel .secondary { background: linear-gradient(to bottom, #dd8257, var(--dirt)); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 4px 0 var(--dirt-dark); }
+.home-panel .primary:hover:not(:disabled), .home-panel .secondary:hover { filter: brightness(1.06); }
+.home-panel .primary:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 1px 0 var(--grass-dark); }
+.home-panel .secondary:active { transform: translateY(3px); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3), 0 1px 0 var(--dirt-dark); }
+.home-panel .primary:focus-visible, .home-panel .secondary:focus-visible { outline: 3px solid var(--cream); outline-offset: 2px; }
+.home-panel input {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 2px solid var(--wood-dark);
+  background: var(--cream);
+  color: var(--wood-dark);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 rgba(74, 47, 31, 0.15);
+}
+.home-panel input::placeholder { color: #a8876b; font-weight: 400; }
+.home-panel input:focus { outline: 3px solid var(--grass); outline-offset: 1px; }
+.home-panel .link { color: #ffe08a; font-weight: 600; }
+.home-panel .muted { color: var(--muted); }
+.home-panel .small { opacity: 0.85; }
+.home-panel .segmented { background: rgba(74, 47, 31, 0.45); }
+.home-panel .character-tile, .home-panel .face-tile { background: rgba(74, 47, 31, 0.4); }
+.home-panel .character-tile.selected { background: rgba(63, 154, 95, 0.45); }
+.home.customize .home-panel { align-self: stretch; }
+.home-stage { position: relative; pointer-events: none; }
+.home-stage .pill.clock { position: absolute; top: 0; right: 0; backdrop-filter: blur(6px); }
+.home-title { display: flex; flex-direction: column; gap: 10px; }
+/* PlayGround wordmark (ui/Logo.tsx): sun-yellow and grass-green letters with a thick wood-brown outline. */
+.logo {
+  margin: 0;
+  font-family: "Lilita One", system-ui, sans-serif;
+  font-size: 3em;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  transform: rotate(-2deg);
+  transform-origin: left center;
+}
+.logo span { -webkit-text-stroke: 8px var(--wood-dark, #4a2f1f); paint-order: stroke fill; text-shadow: 0 5px 0 var(--wood-dark, #4a2f1f); }
+.logo-play { color: #ffd66b; }
+.logo-ground { color: #8fdc9f; }
+@keyframes panel-in {
+  from { transform: translateY(8px); opacity: 0; }
+}
+@media (max-width: 720px) {
+  /* Phones: character up top, menu as a bottom sheet. */
+  .home-ui, .home.customize .home-ui { grid-template-columns: 1fr; grid-template-rows: minmax(180px, 38vh) minmax(0, 1fr); gap: 12px; }
+  .home-stage { grid-row: 1; }
+  .home-panel { grid-row: 2; align-self: end; padding: 18px; }
+  .home.customize .home-panel { align-self: stretch; }
+  .logo { font-size: 2.5em; }
+}
+
+/* Loading screen (ui/LoadingScreen.tsx): night sky over a dusk horizon, like the in-game sky; fades out over the scene. */
+.loading {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: linear-gradient(to bottom, #0a1430 0%, #25375e 62%, #f2a77a 100%);
+  transition: opacity 0.5s ease-out;
+}
+.loading.done { opacity: 0; pointer-events: none; }
+.loading-body { width: min(320px, 100%); display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.loading-icon { font-size: 48px; line-height: 1; animation: loading-bob 1.6s ease-in-out infinite; }
+.loading .logo { transform-origin: center; }
+.loading-bar { width: 100%; height: 16px; padding: 2px; border-radius: 999px; border: 2px solid var(--wood-dark); background: var(--wood); box-shadow: 0 3px 0 var(--wood-dark); overflow: hidden; }
+.loading-bar > div { height: 100%; border-radius: 999px; background: linear-gradient(to bottom, #56b072, var(--grass)); box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.3); transition: width 0.25s ease-out; }
+.loading p { margin: 0; }
+.loading-body .muted { font-variant-numeric: tabular-nums; }
+.loading-tip { position: absolute; bottom: 24px; left: 16px; right: 16px; text-align: center; color: var(--text); opacity: 0.85; animation: tip-in 0.4s ease-out; }
+@keyframes loading-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes tip-in {
+  from { opacity: 0; transform: translateY(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-panel, .loading-icon, .loading-tip { animation: none; }
+  .loading, .loading-bar > div, .home-panel .primary, .home-panel .secondary { transition: none; }
+}
+.home-panel p { margin: 0; }
+.home-panel .field { display: flex; flex-direction: column; gap: 6px; font-size: 0.9em; color: var(--muted); }
+.character-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 10px; background: rgba(0, 0, 0, 0.3); }
+.segmented button { padding: 8px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.segmented button.selected { background: var(--accent); color: var(--text); font-weight: 600; }
+.submenu-header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.submenu-header .link { justify-self: start; }
+.submenu-header .panel-title { margin: 0; font-size: 1.1em; }
+.secondary { padding: 10px; border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 10px; background: rgba(255, 255, 255, 0.06); font-weight: 600; cursor: pointer; }
+.character-tile { aspect-ratio: 1; padding: 2px; border: 2px solid transparent; border-radius: 10px; background: rgba(0, 0, 0, 0.3); cursor: pointer; }
+.character-tile { overflow: hidden; }
+.character-tile img { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+/* Zoom thumbnails onto the part being picked (hairstyles have their own head close-ups). */
+.crop-hairstyle .character-tile img { image-rendering: auto; }
+.crop-outfit .character-tile img { transform: scale(1.8); transform-origin: 50% 85%; }
+.segmented.four { grid-template-columns: repeat(4, 1fr); }
+.segmented.four button { padding: 8px 4px; }
+.face-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 4px; }
+.face-tile { aspect-ratio: 2; padding: 0; border: 2px solid transparent; border-radius: 8px; overflow: hidden; background: rgba(0, 0, 0, 0.3); cursor: pointer; }
+.face-tile img { width: 100%; height: 100%; display: block; }
+.face-tile.selected { border-color: var(--accent); }
+.character-tile.selected { border-color: var(--accent); background: rgba(79, 140, 255, 0.25); }
+.field-header { display: flex; justify-content: space-between; align-items: center; }
+.link { background: none; border: 0; padding: 0; color: var(--accent); cursor: pointer; font-size: 0.9em; }
+.color-row { display: grid; grid-template-columns: 52px 1fr; align-items: center; gap: 8px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 4px; }
+.swatch { width: 20px; height: 20px; padding: 0; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.swatch.selected { border-color: white; transform: scale(1.15); }
+.swatch.original { background: linear-gradient(135deg, transparent 45%, var(--warn) 45%, var(--warn) 55%, transparent 55%), rgba(255, 255, 255, 0.12); }
+.primary {
+  padding: 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary:disabled { opacity: 0.6; cursor: wait; }
+
+/* HUD */
+/* Above the touch joystick and jump button, so open panels cover them. */
+.hud { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
+.hud > * { pointer-events: auto; }
+.panel {
+  background: var(--panel);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  font-size: 0.9em;
+  backdrop-filter: blur(6px);
+}
+.panel-title { font-weight: 600; margin-bottom: 6px; }
+.players { position: absolute; top: 16px; left: 16px; min-width: 160px; }
+.players-toggle { display: block; width: 100%; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.players-toggle[aria-expanded="false"] { margin: 0; }
+.player-row { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
+.dot { width: 10px; height: 10px; border-radius: 50%; outline: 2px solid transparent; transition: outline-color 0.1s; }
+.dot.speaking { outline-color: var(--speaking); }
+.toolbar { position: absolute; top: 16px; right: 16px; display: flex; gap: 8px; }
+.pill {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--panel);
+  cursor: pointer;
+}
+.pill.warn { background: rgba(255, 107, 107, 0.85); }
+.pill.active { background: var(--accent); }
+.pill.clock { cursor: default; font-variant-numeric: tabular-nums; }
+
+.menu { position: absolute; top: 64px; right: 16px; width: min(280px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 14px; max-height: calc(100% - 80px); overflow-y: auto; }
+.menu-players { overflow-y: auto; }
+.menu-header { display: flex; align-items: center; justify-content: space-between; }
+.menu-header .panel-title { margin: 0; }
+.icon-btn { background: none; border: 0; cursor: pointer; padding: 2px 6px; color: var(--muted); }
+.menu-row { display: flex; flex-direction: column; gap: 6px; }
+.menu-label { display: flex; justify-content: space-between; }
+.menu input[type="range"] { width: 100%; accent-color: var(--accent); }
+.danger { padding: 10px; border: 0; border-radius: 10px; background: var(--warn); font-weight: 600; cursor: pointer; }
+.help { position: absolute; top: 64px; right: 16px; max-width: 280px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+.actions { position: absolute; right: 16px; bottom: 192px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.emote-row { display: flex; gap: 6px; }
+.pill.emote { padding: 8px 10px; }
+.minimap {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+.map-backdrop { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.35); z-index: 2; }
+.world-map { display: flex; flex-direction: column; gap: 10px; }
+.world-map-canvas { width: min(640px, calc(100vw - 60px), calc(100vh - 170px)); aspect-ratio: 1; border-radius: 8px; }
+.world-map .segmented button { padding: 6px 10px; font-size: 0.85em; }
+.chat { position: absolute; left: 16px; bottom: 16px; width: min(360px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 6px; }
+.chat-log { max-height: 160px; overflow-y: auto; font-size: 0.9em; text-shadow: 0 1px 2px black; }
+.chat input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--panel);
+}
+.ghost { align-self: flex-start; background: var(--panel); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+
+.nametag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: white;
+  font-size: 14px;
+  white-space: nowrap;
+  border: 2px solid transparent;
+  user-select: none;
+  pointer-events: none;
+}
+.nametag.speaking { border-color: var(--speaking); }
+
+/* Bubble over a player's head (world/PlayerBubble.tsx); the anchor puts its tail on the point. */
+.bubble-anchor { transform: translate(-50%, -100%); padding-bottom: 6px; pointer-events: none; user-select: none; }
+.bubble {
+  position: relative;
+  width: max-content;
+  max-width: 220px;
+  padding: 3px 10px 4px;
+  border-radius: 12px;
+  background: white;
+  color: #2c3352;
+  font-size: 14px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+/* Tail pointing down at the player. */
+.bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: white;
+  border-bottom: 0;
+}
+.bubble.say { animation: bubble-pop 0.18s ease-out; }
+.bubble.zzz, .bubble.dots { font-weight: 700; white-space: nowrap; color: #3a4366; }
+.bubble.zzz span, .bubble.dots span { display: inline-block; margin: 0 1px; animation: bubble-bob 1.8s ease-in-out infinite; }
+.bubble.zzz span:nth-child(1) { font-size: 0.8em; }
+.bubble.zzz span:nth-child(2) { font-size: 0.9em; animation-delay: 0.3s; }
+.bubble.zzz span:nth-child(3) { font-size: 1.05em; animation-delay: 0.6s; }
+.bubble.dots span { animation-duration: 1s; }
+.bubble.dots span:nth-child(2) { animation-delay: 0.15s; }
+.bubble.dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes bubble-bob {
+  0%, 100% { transform: translateY(0); opacity: 0.45; }
+  50% { transform: translateY(-3px); opacity: 1; }
+}
+@keyframes bubble-pop {
+  from { transform: scale(0.6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bubble, .bubble span { animation: none !important; opacity: 1 !important; }
+}
+
+.joystick-zone { position: fixed; left: 0; bottom: 0; width: 50%; height: 60%; z-index: 1; }
+
+/* See-through like the joystick, so it doesn't hide the world. */
+.jump-button {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 1;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 32px;
+  line-height: 1;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.jump-button:active { background: rgba(255, 255, 255, 0.3); }
+
+@media (pointer: fine) {
+  .joystick-zone, .jump-button { display: none; }
+}
+@media (max-width: 600px), (pointer: coarse) {
+  .players { font-size: 0.8em; min-width: 0; }
+  /* Compact toolbar so it (with the clock) fits beside the players panel. */
+  .toolbar { gap: 6px; }
+  .toolbar .pill { padding: 6px 10px; font-size: 0.85em; }
+  .pill-label { display: none; }
+  /* Left half is the joystick zone on phones; the jump button sits bottom right. */
+  .chat { left: auto; right: 112px; width: calc(50% - 120px); }
+  /* Top left (the players list is in the menu on touch): the bottom is joystick (left) and chat (right). */
+  .minimap { top: 16px; left: 16px; right: auto; bottom: auto; width: 112px; height: 112px; }
+  .actions { top: 58px; bottom: auto; }
+  /* The menu and controls open over the actions column. */
+  .menu, .help { z-index: 1; }
+}
+
+/* Phones are landscape-only (ui/landscape.ts locks it where the browser allows); portrait gets this cover. */
+.rotate-overlay { display: none; }
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 600px) {
+  .rotate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    text-align: center;
+    font-weight: 600;
+    background: var(--bg);
+  }
+  .rotate-icon { font-size: 56px; animation: rotate-hint 2s ease-in-out infinite; }
+}
+@keyframes rotate-hint {
+  0%, 20% { transform: rotate(0deg); }
+  50%, 70% { transform: rotate(-90deg); }
+  100% { transform: rotate(0deg); }
+}
