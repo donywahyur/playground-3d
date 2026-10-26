@@ -26,6 +26,23 @@ export const canCamLock = typeof window !== "undefined" && "exitPointerLock" in 
 /** Phones and tablets: on-screen joystick, compact HUD. */
 export const isTouch = typeof window !== "undefined" && matchMedia("(pointer: coarse)").matches;
 
+/**
+ * Rendering quality. Low: no antialiasing, pixel ratio 1, 30 fps, small shadow map that only your own character
+ * casts into. High: today's look at up to 60 fps. Auto starts Low on phones/tablets and machines with few cores,
+ * and drops to Low for the session if the frame rate can't keep up.
+ */
+export type QualityPref = "auto" | "low" | "high";
+export type Quality = "low" | "high";
+const QUALITY_PREFS: QualityPref[] = ["auto", "low", "high"];
+const weakDevice = typeof navigator !== "undefined" && (isTouch || (navigator.hardwareConcurrency ?? 8) <= 4);
+
+function loadQualityPref(): QualityPref {
+  const saved = loadPref(PREF.quality) as QualityPref | null;
+  return saved && QUALITY_PREFS.includes(saved) ? saved : "auto";
+}
+
+const resolveQuality = (pref: QualityPref, autoLow: boolean): Quality => (pref === "auto" ? (weakDevice || autoLow ? "low" : "high") : pref);
+
 export type Phase = "join" | "connecting" | "playing";
 export type MicState = "off" | "on" | "denied";
 
@@ -58,12 +75,20 @@ interface GameStore {
   mapNorthUp: boolean;
   /** Touch joystick stays put in the corner instead of appearing where the thumb lands. */
   joystickFixed: boolean;
+  qualityPref: QualityPref;
+  /** Auto saw a low frame rate this session. */
+  autoLow: boolean;
+  /** What renders now (qualityPref resolved). The canvases remount when it changes. */
+  quality: Quality;
   set: (patch: Partial<GameStore>) => void;
   /** The setters below also remember the choice for next time. */
   setVolume: (v: number) => void;
   setCamLock: (on: boolean) => void;
   setMapNorthUp: (on: boolean) => void;
   setJoystickFixed: (on: boolean) => void;
+  setQualityPref: (pref: QualityPref) => void;
+  /** The frame rate stays low: Auto switches to Low for the rest of the session. */
+  reportSlow: () => void;
   upsertPlayer: (p: PlayerInfo) => void;
   removePlayer: (id: string) => void;
   pushChat: (m: ChatMessage) => void;
@@ -89,6 +114,9 @@ export const useGame = create<GameStore>((set) => ({
   camLock: canCamLock && loadFlag(PREF.camLock),
   mapNorthUp: loadFlag(PREF.mapNorthUp),
   joystickFixed: loadFlag(PREF.joystickFixed),
+  qualityPref: loadQualityPref(),
+  autoLow: false,
+  quality: resolveQuality(loadQualityPref(), false),
   set: (patch) => set(patch),
   setVolume: (volume) => {
     savePref(PREF.volume, String(volume));
@@ -106,6 +134,11 @@ export const useGame = create<GameStore>((set) => ({
     saveFlag(PREF.joystickFixed, joystickFixed);
     set({ joystickFixed });
   },
+  setQualityPref: (qualityPref) => {
+    savePref(PREF.quality, qualityPref);
+    set((s) => ({ qualityPref, quality: resolveQuality(qualityPref, s.autoLow) }));
+  },
+  reportSlow: () => set((s) => ({ autoLow: true, quality: resolveQuality(s.qualityPref, true) })),
   upsertPlayer: (p) => set((s) => ({ players: { ...s.players, [p.id]: p } })),
   removePlayer: (id) =>
     set((s) => {

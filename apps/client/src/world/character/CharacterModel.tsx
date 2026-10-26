@@ -1,11 +1,15 @@
 import { Suspense, useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { useAnimations, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
 import {
   AnimationClip,
+  AnimationMixer,
+  Frustum,
   LoopOnce,
+  Matrix4,
   QuaternionKeyframeTrack,
   Skeleton,
+  Sphere,
   Vector3,
   VectorKeyframeTrack,
   type AnimationAction,
@@ -16,8 +20,9 @@ import {
   type Object3D,
   type SkinnedMesh,
 } from "three";
+import { useGame } from "../../state/store";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { CHARACTERS, GRAVITY, JUMP_SPEED, type Anim, type Appearance } from "@hangout/shared";
+import { GRAVITY, JUMP_SPEED, type Anim, type Appearance } from "@hangout/shared";
 import { modelUrl } from "./catalog";
 import { makeEmoteClips } from "./emotes";
 import { addFace, removeFaceInk, setEyesClosed } from "./face";
@@ -79,9 +84,18 @@ interface Props {
   appearance: Appearance;
   /** Read every frame so animation follows live state without re-rendering. */
   getAnim: () => string;
+  /** Your own character: always casts a real shadow and animates every frame. */
+  local?: boolean;
 }
 
 const tmpPos = new Vector3();
+const frustum = new Frustum();
+/** Roughly the whole character around its feet, so one partly on screen counts as on screen. */
+const bounds = new Sphere(new Vector3(), 1.5);
+const viewProj = new Matrix4();
+/** Other players farther than this (m) from the camera, or off screen, animate at FAR_ANIM_HZ. */
+const NEAR_ANIM_DIST = 30;
+const FAR_ANIM_HZ = 5;
 
 /**
  * Every Kenney GLB carries an identical "colormap" material, but each file load
@@ -90,9 +104,12 @@ const tmpPos = new Vector3();
  */
 let sharedMaterial: Material | null = null;
 
-/** Fetch and parse every character up front so a player joining mid-game doesn't stall on it. */
-export function preloadCharacters() {
-  for (const c of CHARACTERS) useGLTF.preload(modelUrl(c));
+/**
+ * Fetch and parse your own character up front. Others load when someone wearing them shows up (or you pick
+ * them in the customizer), each a small file; preloading all of them cost every player the full set.
+ */
+export function preloadCharacters({ character, hairstyle }: Pick<Appearance, "character" | "hairstyle">) {
+  for (const c of new Set([character, hairstyle])) useGLTF.preload(modelUrl(c));
 }
 
 /**
@@ -108,11 +125,13 @@ function swapHead(model: Object3D, headScene: Object3D) {
   dst.skeleton = new Skeleton(dst.skeleton.bones, src.skeleton.boneInverses.map((m) => m.clone()));
 }
 
-function Model({ appearance, getAnim }: Props) {
+function Model({ appearance, getAnim, local = false }: Props) {
   const { character, hairstyle, skin, hair, top, dress, bottom, shoes, eyes, mouth, cheeks, eyeColor } = appearance;
   const { scene, animations } = useGLTF(modelUrl(character));
   const { scene: headScene } = useGLTF(modelUrl(hairstyle));
   const root = useRef<Group>(null);
+  // Low quality: only your own character casts into the shadow map (others keep their blob shadow).
+  const castShadow = useGame((s) => local || s.quality === "high");
 
   // Each player needs its own skeleton, and its own UVs when recolored.
   const { model, face } = useMemo(() => {
@@ -124,20 +143,24 @@ function Model({ appearance, getAnim }: Props) {
     m.traverse((o) => {
       const mesh = o as Mesh;
       if (!mesh.isMesh) return;
-      mesh.castShadow = true;
+      mesh.castShadow = castShadow;
       sharedMaterial ??= mesh.material as Material;
       mesh.material = sharedMaterial;
     });
     // After the material swap above, which would otherwise take over the face's own material.
     const face = sharedMaterial ? addFace(m, look, sharedMaterial) : null;
     return { model: m, face };
-  }, [scene, headScene, character, hairstyle, skin, hair, top, dress, bottom, shoes, eyes, mouth, cheeks, eyeColor]);
+  }, [scene, headScene, character, hairstyle, skin, hair, top, dress, bottom, shoes, eyes, mouth, cheeks, eyeColor, castShadow]);
 
   const clips = useMemo(() => {
     const jump = animations.find((c) => c.name === "jump");
     return [...animations, ...(jump ? [mirrorClip(jump, "jump-mirror")] : []), ...makeEmoteClips()];
   }, [animations]);
-  const { actions } = useAnimations(clips, root);
+  // Our own mixer (not drei's useAnimations) so far-away players can be ticked less often. It only references
+  // this model, so both are garbage-collected together; no cleanup needed (uncaching in an effect cleanup
+  // would break StrictMode's remount, which reuses these memoized actions).
+  const mixer = useMemo(() => new AnimationMixer(model), [model]);
+  const actions = useMemo(() => Object.fromEntries(clips.map((c) => [c.name, mixer.clipAction(c)])) as Record<string, AnimationAction>, [mixer, clips]);
   useEffect(() => {
     for (const name of ["jump", "jump-mirror"]) {
       const a = actions[name];
@@ -147,12 +170,26 @@ function Model({ appearance, getAnim }: Props) {
     }
   }, [actions]);
 
-  const state = useRef({ clip: null as Clip | null, airT: 0, lastY: NaN, rising: false, hops: 0, blinkAt: 0, eyesClosed: false });
+  const state = useRef({ clip: null as Clip | null, airT: 0, lastY: NaN, rising: false, hops: 0, blinkAt: 0, eyesClosed: false, mixerDt: 0 });
 
-  useFrame(({ clock }, rawDt) => {
+  useFrame(({ clock, camera }, rawDt) => {
     if (!root.current) return;
     const dt = Math.max(Math.min(rawDt, 0.1), 1e-4);
     const s = state.current;
+    const pos = root.current.getWorldPosition(tmpPos);
+
+    // Advance the animation: every frame up close, a few times a second when far away or off screen.
+    s.mixerDt += dt;
+    let detailed = local;
+    if (!detailed && camera.position.distanceTo(pos) < NEAR_ANIM_DIST) {
+      frustum.setFromProjectionMatrix(viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      bounds.center.copy(pos);
+      detailed = frustum.intersectsSphere(bounds);
+    }
+    if (detailed || s.mixerDt >= 1 / FAR_ANIM_HZ) {
+      mixer.update(s.mixerDt);
+      s.mixerDt = 0;
+    }
 
     const now = clock.elapsedTime;
     if (face && now >= s.blinkAt) {
@@ -165,7 +202,7 @@ function Model({ appearance, getAnim }: Props) {
 
     // Detect each takeoff from vertical speed so a held jump (bunny-hopping)
     // replays the jump clip every hop, for local and remote players alike.
-    const y = root.current.getWorldPosition(tmpPos).y;
+    const y = pos.y;
     const rising = Number.isFinite(s.lastY) && (y - s.lastY) / dt > 1;
     const takeoff = anim === "jump" && rising && !s.rising;
     s.lastY = y;

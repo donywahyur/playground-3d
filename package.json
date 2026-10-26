@@ -8,9 +8,14 @@
     "typecheck": "pnpm -r typecheck",
     "e2e:characters": "node scripts/e2e/characters.mjs",
     "e2e:recolor": "node scripts/e2e/recolor-all.mjs",
-    "e2e:perf": "node scripts/e2e/perf.mjs"
+    "e2e:perf": "node scripts/e2e/perf.mjs",
+    "e2e:bench": "node scripts/e2e/bench.mjs"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
+    "meshoptimizer": "^1.3.0",
     "playwright-core": "^1.64.1"
   }
 }

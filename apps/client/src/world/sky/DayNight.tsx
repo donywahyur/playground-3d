@@ -2,7 +2,8 @@ import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { BackSide, Matrix4, Vector3, type AmbientLight, type DirectionalLight, type Fog, type Mesh, type Points, type PointsMaterial } from "three";
 import { localPose } from "../../state/runtime";
-import { mulberry32 } from "../math";
+import { useGame, type Quality } from "../../state/store";
+import { mulberry32, ticker } from "../math";
 import { useCulling } from "../culling";
 import { FOG, sky, updateSky } from "./daytime";
 
@@ -10,8 +11,8 @@ import { FOG, sky, updateSky } from "./daytime";
 const LIGHT_DIST = 50;
 /** Half-size of the shadow frustum around the player (m). */
 const SHADOW_RADIUS = 25;
-const SHADOW_MAP = 1024;
-const SHADOW_TEXEL = (SHADOW_RADIUS * 2) / SHADOW_MAP;
+/** Shadow map size per quality; in Low only your own character casts into it. */
+const SHADOW_MAP: Record<Quality, number> = { high: 1024, low: 512 };
 const ORIGIN = new Vector3();
 const UP = new Vector3(0, 1, 0);
 const lightOffset = new Vector3();
@@ -28,6 +29,8 @@ const tmpCenter = new Vector3();
  */
 function Sun() {
   const light = useRef<DirectionalLight>(null);
+  const mapSize = SHADOW_MAP[useGame((s) => s.quality)];
+  const texel = (SHADOW_RADIUS * 2) / mapSize;
   useCulling(light);
   useFrame(() => {
     const l = light.current;
@@ -36,8 +39,8 @@ function Sun() {
     lightRot.lookAt(lightOffset, ORIGIN, UP);
     lightRotInv.copy(lightRot).invert();
     const c = tmpCenter.copy(localPose.position).applyMatrix4(lightRotInv);
-    c.x = Math.round(c.x / SHADOW_TEXEL) * SHADOW_TEXEL;
-    c.y = Math.round(c.y / SHADOW_TEXEL) * SHADOW_TEXEL;
+    c.x = Math.round(c.x / texel) * texel;
+    c.y = Math.round(c.y / texel) * texel;
     c.applyMatrix4(lightRot);
     l.target.position.copy(c);
     l.target.updateMatrixWorld();
@@ -49,9 +52,9 @@ function Sun() {
     <directionalLight
       ref={light}
       castShadow
-      shadow-mapSize={[SHADOW_MAP, SHADOW_MAP]}
+      shadow-mapSize={[mapSize, mapSize]}
       // Offsets lookups along the normal; without it the textured props self-shadow in stripes (acne).
-      shadow-normalBias={SHADOW_TEXEL * 1.5}
+      shadow-normalBias={texel * 1.5}
       shadow-camera-left={-SHADOW_RADIUS}
       shadow-camera-right={SHADOW_RADIUS}
       shadow-camera-top={SHADOW_RADIUS}
@@ -162,7 +165,10 @@ export function DayNight() {
     updateSky();
     return sky.horizon.clone();
   }, []);
-  useFrame(() => {
+  // A day lasts DAY_LENGTH_MS (24 min), so twice a second is plenty.
+  const skyTick = useMemo(() => ticker(2), []);
+  useFrame((_, delta) => {
+    if (!skyTick(delta)) return;
     updateSky();
     ambient.current?.color.copy(sky.ambientColor);
     if (ambient.current) ambient.current.intensity = sky.ambientIntensity;

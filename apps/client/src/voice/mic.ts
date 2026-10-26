@@ -23,7 +23,9 @@ export async function getMic(): Promise<{ stream: MediaStream } | { stream: null
 }
 
 const THRESHOLD = 0.02; // RMS level that counts as speech
-const HOLD_MS = 300; // keep "speaking" on briefly after the level drops
+// Keep "speaking" on after the level drops, long enough to bridge the gaps between words: every flip is a
+// message to the server and a patch to everyone.
+const HOLD_MS = 600;
 
 /** Polls the mic level and reports speaking on/off transitions. Returns a stop function. */
 export function watchSpeaking(ctx: AudioContext, stream: MediaStream, onChange: (speaking: boolean) => void) {
@@ -36,13 +38,15 @@ export function watchSpeaking(ctx: AudioContext, stream: MediaStream, onChange: 
   let speaking = false;
   let lastLoud = 0;
   const timer = setInterval(() => {
-    analyser.getFloatTimeDomainData(buf);
-    let sum = 0;
-    for (const v of buf) sum += v * v;
-    const rms = Math.sqrt(sum / buf.length);
     const enabled = stream.getAudioTracks().some((t) => t.enabled);
     const now = performance.now();
-    if (enabled && rms > THRESHOLD) lastLoud = now;
+    // Muted: nothing to measure.
+    if (enabled) {
+      analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (const v of buf) sum += v * v;
+      if (Math.sqrt(sum / buf.length) > THRESHOLD) lastLoud = now;
+    }
     const next = enabled && now - lastLoud < HOLD_MS;
     if (next !== speaking) {
       speaking = next;

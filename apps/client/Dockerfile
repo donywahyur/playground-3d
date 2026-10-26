@@ -13,6 +13,9 @@ RUN pnpm install --frozen-lockfile --filter @hangout/client...
 ARG VITE_SERVER_URL
 RUN test -n "$VITE_SERVER_URL" || (echo "VITE_SERVER_URL build arg is required" && exit 1)
 RUN pnpm --filter @hangout/client build
+# Compress once at build time at the highest level; nginx serves the .gz files as they are (gzip_static).
+# Meshopt GLBs are laid out to compress well with gzip. PNGs are already compressed.
+RUN find apps/client/dist -type f \( -name '*.js' -o -name '*.css' -o -name '*.html' -o -name '*.svg' -o -name '*.json' -o -name '*.glb' \) -exec gzip -9 -k {} +
 
 FROM nginx:1.27-alpine
 COPY apps/client/nginx.conf /etc/nginx/conf.d/default.conf

@@ -13,6 +13,21 @@ export function rotateXZ(x: number, z: number, rotY: number): [number, number] {
   return [x * c + z * s, -x * s + z * c];
 }
 
+/**
+ * For per-frame work that doesn't need every frame: feed it the frame delta (s), it returns true about `hz`
+ * times a second.
+ */
+export function ticker(hz: number) {
+  const step = 1 / hz;
+  let acc = step; // fire on the first frame
+  return (delta: number) => {
+    acc += delta;
+    if (acc < step) return false;
+    acc = Math.min(acc - step, step);
+    return true;
+  };
+}
+
 /** Deterministic PRNG so every client builds the same world. */
 export function mulberry32(seed: number) {
   return () => {

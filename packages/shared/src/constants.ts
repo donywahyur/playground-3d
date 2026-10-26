@@ -20,6 +20,12 @@ export const MOVE_SEND_HZ = PATCH_HZ;
 // Proximity voice
 export const AUDIO_REF_DIST = 2; // full volume inside this radius (m)
 export const AUDIO_MAX_DIST = 20; // silent beyond this radius (m)
+// Voice is only sent to players who could hear it. Two thresholds so walking along the edge doesn't flap,
+// and sending resumes a few meters before the voice becomes audible.
+export const VOICE_SEND_ON = AUDIO_MAX_DIST + 4;
+export const VOICE_SEND_OFF = AUDIO_MAX_DIST + 8;
+/** Opus cap per voice stream (bps); speech stays clear well below Chrome's 32 kbps default. */
+export const VOICE_MAX_BITRATE = 24_000;
 
 // Day/night cycle. Every client derives the time of day from the server clock.
 export const DAY_LENGTH_MS = 24 * 60_000; // one in-game hour per real minute

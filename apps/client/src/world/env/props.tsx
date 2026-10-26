@@ -3,7 +3,7 @@ import { useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import { CuboidCollider, CylinderCollider, RigidBody } from "@react-three/rapier";
 import { Box3, Euler, FrontSide, Matrix4, Quaternion, Vector3, type InstancedMesh, type Material, type Mesh, type MeshStandardMaterial } from "three";
-import { addCulled } from "../culling";
+import { addCulled, propShadows } from "../culling";
 import { rotateXZ } from "../math";
 
 /**
@@ -220,7 +220,7 @@ export function useKitModel(m: ModelRef, { receiveShadow = false } = {}) {
     model.traverse((o) => {
       const mesh = o as Mesh;
       if (!mesh.isMesh) return;
-      mesh.castShadow = true;
+      mesh.castShadow = propShadows();
       mesh.receiveShadow = receiveShadow;
       mesh.material = sharedMaterial(m.kit, mesh.material as Material);
     });

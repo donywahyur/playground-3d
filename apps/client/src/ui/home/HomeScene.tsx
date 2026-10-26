@@ -4,6 +4,8 @@ import { Physics } from "@react-three/rapier";
 import { MathUtils, Vector3, type Group, type PerspectiveCamera } from "three";
 import type { Anim, Appearance } from "@hangout/shared";
 import { localPose } from "../../state/runtime";
+import { useGame } from "../../state/store";
+import { canvasOptions, FrameDriver } from "../../world/FrameDriver";
 import { CharacterModel, preloadCharacters } from "../../world/character/CharacterModel";
 import { DayNight } from "../../world/sky/DayNight";
 import { Environment, preloadEnvironment } from "../../world/env/Environment";
@@ -73,7 +75,7 @@ function Character({ appearance, focus, anim }: { appearance: Appearance; focus:
   });
   return (
     <group ref={group} position={SPOT.toArray()} rotation-y={YAW + 0.35}>
-      <CharacterModel appearance={appearance} getAnim={() => anim.current} />
+      <CharacterModel appearance={appearance} getAnim={() => anim.current} local />
     </group>
   );
 }
@@ -98,12 +100,14 @@ export function HomeScene({
   // first render, before any file can finish, so the loading screen's progress counts all of them from the start.
   useState(() => {
     preloadEnvironment();
-    preloadCharacters();
+    preloadCharacters(appearance);
   });
   // Lamps and the sun's shadow area follow the local player; center them on the character.
   useEffect(() => void localPose.position.copy(SPOT), []);
+  const quality = useGame((s) => s.quality);
   return (
-    <Canvas shadows="percentage" dpr={[1, 1.5]} camera={{ fov: 40 }} className="canvas home-canvas">
+    <Canvas key={quality} {...canvasOptions(quality)} shadows="percentage" camera={{ fov: 40 }} className="canvas home-canvas">
+      <FrameDriver quality={quality} />
       <DayNight />
       <Rig focus={focus} stage={stage} />
       <Suspense fallback={null}>

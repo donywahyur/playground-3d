@@ -118,6 +118,24 @@ button, input { font: inherit; color: inherit; }
 .home-panel .character-tile, .home-panel .face-tile { background: rgba(74, 47, 31, 0.4); }
 .home-panel .character-tile.selected { background: rgba(63, 154, 95, 0.45); }
 .home.customize .home-panel { align-self: stretch; }
+.home-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.home-footer p { margin: 0; }
+.home-footer .link { white-space: nowrap; }
+/* "What's new" (ui/home/PatchNotes.tsx): one block per release, newest first. */
+/* Opaque, so the panel's plank seams don't run through the text. */
+.patch-note { padding: 12px 14px; border-radius: 12px; background: #7a4e34; box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.12); }
+.patch-note summary { display: flex; flex-direction: column; gap: 4px; cursor: pointer; list-style: none; }
+.patch-note summary::-webkit-details-marker { display: none; }
+.patch-note summary:focus-visible { outline: 3px solid var(--cream); outline-offset: 4px; border-radius: 6px; }
+.patch-note-header { display: flex; align-items: center; gap: 8px; }
+/* Chevron before the version: points right when collapsed, down when open. */
+.patch-note-header::before { content: "▸"; display: inline-block; width: 0.8em; font-size: 1.3em; line-height: 1; transition: transform 0.15s; }
+.patch-note[open] .patch-note-header::before { transform: rotate(90deg); }
+.patch-version { font-family: "Lilita One", system-ui, sans-serif; font-size: 1.1em; letter-spacing: 0.02em; }
+.patch-current { padding: 2px 8px; border-radius: 999px; background: var(--grass); font-size: 0.75em; font-weight: 700; }
+.patch-date { margin-left: auto; }
+.patch-title { font-weight: 700; }
+.patch-changes { margin: 8px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; line-height: 1.35; }
 .home-stage { position: relative; pointer-events: none; }
 .home-stage .pill.clock { position: absolute; top: 0; right: 0; backdrop-filter: blur(6px); }
 .home-title { display: flex; flex-direction: column; gap: 10px; }
@@ -196,6 +214,7 @@ button, input { font: inherit; color: inherit; }
 /* Zoom thumbnails onto the part being picked (hairstyles have their own head close-ups). */
 .crop-hairstyle .character-tile img { image-rendering: auto; }
 .crop-outfit .character-tile img { transform: scale(1.8); transform-origin: 50% 85%; }
+.segmented.three { grid-template-columns: repeat(3, 1fr); }
 .segmented.four { grid-template-columns: repeat(4, 1fr); }
 .segmented.four button { padding: 8px 4px; }
 .face-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 4px; }

@@ -15,13 +15,14 @@ export const Player = schema(
     mouth: t.int8(),
     cheeks: t.int8(),
     eyeColor: t.int8(),
-    x: t.number(),
-    y: t.number(),
-    z: t.number(),
-    rotY: t.number(),
-    anim: t.string(),
+    // Pose in wire units (WirePose in @hangout/shared: cm, 1e-4 rad, ANIMS index); fromWire converts.
+    x: t.int16(),
+    y: t.int16(),
+    z: t.int16(),
+    rotY: t.int16(),
+    anim: t.uint8(),
     /** Sender clock (ms) of the latest move, relayed for client-side interpolation. */
-    t: t.number(),
+    t: t.uint32(),
     muted: t.boolean(),
     speaking: t.boolean(),
     /** No input for a while (or the tab is hidden); shows a bubble over the player. */

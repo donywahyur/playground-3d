@@ -7,6 +7,8 @@ import { Logo } from "../Logo";
 import { Customize, type PickMode } from "./Customize";
 import { HomeScene } from "./HomeScene";
 import { LoadingScreen } from "./LoadingScreen";
+import { PatchNotes } from "./PatchNotes";
+import { VERSION } from "./releases";
 
 function initialAppearance(): Appearance {
   try {
@@ -23,7 +25,7 @@ const WAVE_TIME = 2.4;
 export function JoinScreen({ onJoin }: { onJoin: (name: string, appearance: Appearance) => void }) {
   const phase = useGame((s) => s.phase);
   const error = useGame((s) => s.error);
-  const [view, setView] = useState<"main" | "customize">("main");
+  const [view, setView] = useState<"main" | "customize" | "updates">("main");
   const [mode, setMode] = useState<PickMode>("character");
   const [name, setName] = useState(() => loadPref(PREF.name) ?? "");
   const [look, setLook] = useState(initialAppearance);
@@ -59,6 +61,10 @@ export function JoinScreen({ onJoin }: { onJoin: (name: string, appearance: Appe
             <div className="home-panel">
               <Customize look={look} update={update} mode={mode} setMode={setMode} onDone={() => setView("main")} />
             </div>
+          ) : view === "updates" ? (
+            <div className="home-panel">
+              <PatchNotes onBack={() => setView("main")} />
+            </div>
           ) : (
             <form className="home-panel" onSubmit={submit}>
               <div className="home-title">
@@ -77,7 +83,12 @@ export function JoinScreen({ onJoin }: { onJoin: (name: string, appearance: Appe
                 Customize character
               </button>
               {error && <p className="error">{error}</p>}
-              <p className="muted small">Characters and world by Kenney (kenney.nl), CC0.</p>
+              <div className="home-footer">
+                <p className="muted small">Characters and world by Kenney (kenney.nl), CC0.</p>
+                <button type="button" className="link" onClick={() => setView("updates")}>
+                  What's new · v{VERSION}
+                </button>
+              </div>
             </form>
           )}
           <div className="home-stage" ref={stage}>

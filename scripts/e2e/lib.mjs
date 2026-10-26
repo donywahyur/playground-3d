@@ -15,7 +15,7 @@ export const APP_URL = process.env.APP_URL ?? "http://localhost:5173";
 export const OUT_DIR = new URL("./out/", import.meta.url).pathname;
 mkdirSync(OUT_DIR, { recursive: true });
 
-export async function launch() {
+export async function launch(extraArgs = []) {
   const executablePath = CANDIDATES.find((p) => existsSync(p));
   if (!executablePath) throw new Error("No Chromium browser found; set BROWSER_PATH");
   return chromium.launch({
@@ -26,6 +26,7 @@ export async function launch() {
       "--use-fake-device-for-media-stream", // synthetic beep as mic input
       "--autoplay-policy=no-user-gesture-required",
       "--enable-unsafe-swiftshader", // software WebGL
+      ...extraArgs,
     ],
   });
 }

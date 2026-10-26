@@ -4,17 +4,18 @@ import {
   CLOSE_IDLE,
   IDLE_AFTER_MS,
   IDLE_SIGNOUT_MS,
-  isAnim,
   NAME_MAX_LEN,
   PATCH_HZ,
   ROOM_MAX,
   RUN_SPEED,
   WORLD_HALF_SIZE,
+  decodeMove,
+  fromWire,
   sanitizeAppearance,
+  toWire,
   type ChatMessage,
   type ClockReply,
   type JoinOptions,
-  type MoveMessage,
   type RtcSignalIn,
   type RtcSignalOut,
   type VoiceMessage,
@@ -49,17 +50,21 @@ export class PlaygroundRoom extends Room<{ state: PlaygroundState }> {
       }
     }, 5000);
 
-    this.onMessage("move", (client, msg: MoveMessage) => {
+    // Binary (encodeMove): 13 bytes instead of a msgpack object.
+    this.onMessageBytes("move", (client, bytes: Uint8Array) => {
       const p = this.state.players.get(client.sessionId);
-      if (!p || !isNum(msg?.x) || !isNum(msg.y) || !isNum(msg.z) || !isNum(msg.rotY)) return;
+      const wire = decodeMove(bytes);
+      if (!p || !wire) return;
+      const msg = fromWire(wire);
+      const cur = fromWire(p);
 
       const now = Date.now();
       const dt = Math.max((now - (this.lastMoveAt.get(client.sessionId) ?? now)) / 1000, 0.05);
       this.lastMoveAt.set(client.sessionId, now);
 
       // Cap distance travelled per packet so a client can't teleport.
-      let dx = msg.x - p.x;
-      let dz = msg.z - p.z;
+      let dx = msg.x - cur.x;
+      let dz = msg.z - cur.z;
       const dist = Math.hypot(dx, dz);
       const maxDist = MAX_SPEED * dt;
       if (dist > maxDist) {
@@ -67,12 +72,18 @@ export class PlaygroundRoom extends Room<{ state: PlaygroundState }> {
         dz = (dz / dist) * maxDist;
       }
 
-      p.x = clamp(p.x + dx, -WORLD_HALF_SIZE, WORLD_HALF_SIZE);
-      p.z = clamp(p.z + dz, -WORLD_HALF_SIZE, WORLD_HALF_SIZE);
-      p.y = clamp(msg.y, -5, 20);
-      p.rotY = msg.rotY;
-      p.anim = isAnim(msg.anim) ? msg.anim : "idle";
-      if (isNum(msg.t)) p.t = msg.t;
+      const next = toWire({
+        ...msg,
+        x: clamp(cur.x + dx, -WORLD_HALF_SIZE, WORLD_HALF_SIZE),
+        z: clamp(cur.z + dz, -WORLD_HALF_SIZE, WORLD_HALF_SIZE),
+        y: clamp(msg.y, -5, 20),
+      });
+      p.x = next.x;
+      p.y = next.y;
+      p.z = next.z;
+      p.rotY = next.rotY;
+      p.anim = next.anim;
+      p.t = next.t;
     });
 
     this.onMessage("voice", (client, msg: VoiceMessage) => {
@@ -132,12 +143,7 @@ export class PlaygroundRoom extends Room<{ state: PlaygroundState }> {
       new Player({
         name,
         ...appearance,
-        x: Math.cos(angle) * 3,
-        y: 1,
-        z: Math.sin(angle) * 3,
-        rotY: 0,
-        anim: "idle",
-        t: 0,
+        ...toWire({ x: Math.cos(angle) * 3, y: 1, z: Math.sin(angle) * 3, rotY: 0, anim: "idle", t: 0 }),
         muted: false,
         speaking: false,
         idle: false,

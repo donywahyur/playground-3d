@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber";
 import { AdditiveBlending, Color, SRGBColorSpace, type PointLight, type Points } from "three";
 import { localPose } from "../../state/runtime";
 import { sky } from "../sky/daytime";
+import { ticker } from "../math";
 
 /** A light source that switches on at night: position of its flame/bulb in meters. */
 export interface Lamp {
@@ -80,10 +81,12 @@ export function Lamps({ lamps }: { lamps: Lamp[] }) {
   const dist = useMemo(() => new Float32Array(lamps.length), [lamps]);
   const lightsOn = useRef(false);
   const prewarmed = useRef(false);
+  // Nearest-lamp assignment changes slowly as you walk; no need to sort every frame.
+  const assignTick = useMemo(() => ticker(10), []);
 
   const setLightsVisible = (on: boolean) => lights.current.forEach((l) => l && (l.visible = on));
 
-  useFrame(({ gl, scene, camera }) => {
+  useFrame(({ gl, scene, camera }, delta) => {
     const on = sky.night > 0;
     if (on !== lightsOn.current) setLightsVisible((lightsOn.current = on));
     if (on || sky.sunDir.y > PREWARM_ELEV) {
@@ -101,6 +104,8 @@ export function Lamps({ lamps }: { lamps: Lamp[] }) {
     uniforms.opacity.value = sky.night;
     uniforms.viewHalfHeight.value = gl.domElement.height / 2;
 
+    // By day the pool lights are hidden (above); nothing to place.
+    if (!on || !assignTick(delta)) return;
     const p = localPose.position;
     lamps.forEach((l, i) => (dist[i] = Math.hypot(l.x - p.x, l.z - p.z)));
     order.sort((a, b) => dist[a] - dist[b]);
@@ -108,7 +113,7 @@ export function Lamps({ lamps }: { lamps: Lamp[] }) {
       const light = lights.current[k];
       if (!light) continue;
       const i = order[k];
-      if (i === undefined || sky.night === 0) {
+      if (i === undefined) {
         light.intensity = 0;
         continue;
       }

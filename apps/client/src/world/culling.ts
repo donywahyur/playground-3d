@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from "react";
 import { useThree } from "@react-three/fiber";
 import { Frustum, Matrix4, Sphere, Vector3, type Camera, type DirectionalLight, type InstancedMesh, type Scene } from "three";
+import { useGame } from "../state/store";
 import { FOG } from "./sky/daytime";
 
 /**
@@ -19,6 +20,9 @@ const ENABLED = new URLSearchParams(location.search).get("cull") !== "0";
 
 /** Instances shorter than this (m) don't cast shadows. */
 const MIN_CASTER_HEIGHT = 0.6;
+
+/** Props cast shadows in High quality only. Read when a mesh is set up; the canvas remounts on a change. */
+export const propShadows = () => useGame.getState().quality === "high";
 /** How far a caster just outside the view can still throw a shadow into it (m). */
 const SHADOW_REACH = 12;
 
@@ -75,7 +79,7 @@ export function addCulled(scene: Scene, mesh: InstancedMesh, matrices: Float32Ar
     mesh.instanceMatrix.array.set(matrices);
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-    mesh.castShadow = true;
+    mesh.castShadow = propShadows();
     return () => {};
   }
   const state = stateOf(scene);
@@ -95,7 +99,7 @@ export function addCulled(scene: Scene, mesh: InstancedMesh, matrices: Float32Ar
     mesh,
     matrices,
     spheres,
-    casts: Uint8Array.from(heights, (h) => Number(h >= MIN_CASTER_HEIGHT)),
+    casts: Uint8Array.from(heights, (h) => Number(propShadows() && h >= MIN_CASTER_HEIGHT)),
     order: new Int32Array(n).fill(-1),
     drawn: 0,
     shadowed: 0,

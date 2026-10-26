@@ -5,10 +5,21 @@ interface Source {
   el: HTMLAudioElement;
   node: MediaStreamAudioSourceNode;
   panner: PannerNode;
+  /** Last position sent to the panner. */
+  last: [number, number, number];
 }
 
 // Smoothing time constant for position updates; avoids zipper noise when values jump per frame.
 const SMOOTH = 0.05;
+// Moves smaller than this (m, or unit-vector components) don't reschedule the audio params.
+const EPS = 0.01;
+
+/** True (and `last` updated) if any of the values moved by EPS or more. */
+function moved(last: number[], ...next: number[]) {
+  if (next.every((v, i) => Math.abs(v - last[i]) < EPS)) return false;
+  next.forEach((v, i) => (last[i] = v));
+  return true;
+}
 
 /**
  * Routes each remote voice through a PannerNode so loudness falls off with
@@ -19,6 +30,7 @@ export class SpatialAudio {
   readonly ctx = new AudioContext();
   private master = this.ctx.createGain();
   private sources = new Map<string, Source>();
+  private lastListener = [NaN, NaN, NaN, NaN, NaN, NaN];
 
   constructor() {
     this.master.connect(this.ctx.destination);
@@ -45,14 +57,15 @@ export class SpatialAudio {
 
     const node = this.ctx.createMediaStreamSource(stream);
     const panner = new PannerNode(this.ctx, {
-      panningModel: "HRTF",
+      // Plain left/right panning: HRTF convolves every voice with head filters, far more CPU per player.
+      panningModel: "equalpower",
       distanceModel: "linear",
       refDistance: AUDIO_REF_DIST,
       maxDistance: AUDIO_MAX_DIST,
       rolloffFactor: 1,
     });
     node.connect(panner).connect(this.master);
-    this.sources.set(id, { el, node, panner });
+    this.sources.set(id, { el, node, panner, last: [NaN, NaN, NaN] });
   }
 
   remove(id: string) {
@@ -64,9 +77,22 @@ export class SpatialAudio {
     this.sources.delete(id);
   }
 
-  /** Call every frame with the local listener pose and remote player positions. */
+  /** Call regularly with the local listener pose and remote player positions; unchanged values are skipped. */
   update(listenerPos: Vector3, forward: Vector3, positions: Map<string, Vector3>) {
     const t = this.ctx.currentTime;
+    if (moved(this.lastListener, listenerPos.x, listenerPos.y, listenerPos.z, forward.x, forward.y, forward.z)) {
+      this.moveListener(listenerPos, forward, t);
+    }
+    for (const [id, s] of this.sources) {
+      const p = positions.get(id);
+      if (!p || !moved(s.last, p.x, p.y, p.z)) continue;
+      s.panner.positionX.setTargetAtTime(p.x, t, SMOOTH);
+      s.panner.positionY.setTargetAtTime(p.y, t, SMOOTH);
+      s.panner.positionZ.setTargetAtTime(p.z, t, SMOOTH);
+    }
+  }
+
+  private moveListener(listenerPos: Vector3, forward: Vector3, t: number) {
     const l = this.ctx.listener;
     if (l.positionX) {
       l.positionX.setTargetAtTime(listenerPos.x, t, SMOOTH);
@@ -82,14 +108,6 @@ export class SpatialAudio {
       // Firefox: AudioListener has no AudioParams, only the legacy setters.
       l.setPosition(listenerPos.x, listenerPos.y, listenerPos.z);
       l.setOrientation(forward.x, forward.y, forward.z, 0, 1, 0);
-    }
-
-    for (const [id, s] of this.sources) {
-      const p = positions.get(id);
-      if (!p) continue;
-      s.panner.positionX.setTargetAtTime(p.x, t, SMOOTH);
-      s.panner.positionY.setTargetAtTime(p.y, t, SMOOTH);
-      s.panner.positionZ.setTargetAtTime(p.z, t, SMOOTH);
     }
   }
 

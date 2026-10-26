@@ -199,8 +199,8 @@ function drawMap(ctx: CanvasRenderingContext2D, dpr: number, palette: string[] |
   ctx.fillText("N", cx, cy + 0.5);
 }
 
-/** Redraws a square canvas every animation frame, sized to its CSS box. */
-function useMapCanvas(view: () => Omit<View, "size">) {
+/** Redraws a square canvas about `hz` times a second, sized to its CSS box. */
+function useMapCanvas(hz: number, view: () => Omit<View, "size">) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const palette = usePalette();
   const paletteRef = useRef(palette);
@@ -212,8 +212,11 @@ function useMapCanvas(view: () => Omit<View, "size">) {
     const el = canvas.current!;
     const ctx = el.getContext("2d")!;
     let frame = 0;
-    const draw = () => {
+    let last = -Infinity;
+    const draw = (now: number) => {
       frame = requestAnimationFrame(draw);
+      if (now - last < 1000 / hz - 2) return;
+      last = now;
       const size = el.clientWidth;
       const dpr = Math.min(window.devicePixelRatio, 2);
       if (el.width !== Math.round(size * dpr)) el.width = el.height = Math.round(size * dpr);
@@ -221,13 +224,14 @@ function useMapCanvas(view: () => Omit<View, "size">) {
     };
     frame = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [hz]);
   return canvas;
 }
 
 /** Circular map in a corner, centered on you. Click it to open the full map. */
 export function Minimap() {
-  const canvas = useMapCanvas(() => {
+  // Enough for a map that turns with the camera; full frame rate would redraw it 4x as often.
+  const canvas = useMapCanvas(15, () => {
     const { position: p, forward: f } = localPose;
     return {
       cx: p.x,
@@ -247,7 +251,7 @@ export function WorldMap() {
   const northUp = useGame((s) => s.mapNorthUp);
   const set = useGame((s) => s.set);
   const setNorthUp = useGame((s) => s.setMapNorthUp);
-  const canvas = useMapCanvas(() => ({ cx: 0, cz: 0, range: HALF + 4, heading: 0, round: false, names: true }));
+  const canvas = useMapCanvas(10, () => ({ cx: 0, cz: 0, range: HALF + 4, heading: 0, round: false, names: true }));
   return (
     <div className="map-backdrop" onClick={() => set({ mapOpen: false })}>
       <div className="panel world-map" role="dialog" aria-label="Map" onClick={(e) => e.stopPropagation()}>

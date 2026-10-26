@@ -4,7 +4,7 @@ Multiplayer 3D hangout in the browser with proximity voice chat: the closer anot
 
 - **Client**: Vite + React + React Three Fiber + drei + @react-three/rapier
 - **Server**: Colyseus 0.18 (authoritative positions, WebRTC signaling relay)
-- **Voice**: P2P WebRTC full mesh (max 8 per room), Web Audio `PannerNode` per remote player
+- **Voice**: P2P WebRTC full mesh (max 8 per room), Web Audio `PannerNode` per remote player. Opus capped at 24 kbps with DTX and 60 ms frames, sent only to players within earshot (`VOICE_SEND_ON` / `VOICE_SEND_OFF`) and not at all while muted: about 28 kbps per listener while talking, ~3 kbps while silent
 
 ## Run
 
@@ -75,6 +75,10 @@ apps/client/public/characters/  Kenney "Mini Characters" (CC0, www.kenney.nl): 1
 apps/client/public/kits/        Kenney CC0 kits used by the zones: mini-forest, fantasy-town, pirate, graveyard
 ```
 
+Graphics quality (Menu > Graphics, `quality` in `state/store.ts`): **High** renders at up to 60 fps with antialiasing, DPR up to 1.5 and a 1024 shadow map; **Low** at 30 fps, no antialiasing, DPR 1, and a 512 shadow map that only your own character casts into. **Auto** (default) picks Low on touch devices and machines with 4 or fewer cores, and switches to Low for the session when the frame rate stays under two thirds of the cap (`world/FrameDriver.tsx`). Both drop to 15 fps while you're idle. Changing it remounts the canvas.
+
+Release notes: `apps/client/src/ui/home/releases.ts`, newest first, shown from "What's new" on the join screen. The first entry's version is the game version shown there. Add an entry (in players' words) when shipping something they will notice.
+
 Preview a time of day with `?time=0.8` in the URL (0 sunrise, 0.33 noon, 0.65 sunset, 0.83 midnight). Cycle length is `DAY_LENGTH_MS` in `packages/shared/src/constants.ts`.
 
 Tune hearing range in `packages/shared/src/constants.ts` (`AUDIO_REF_DIST`, `AUDIO_MAX_DIST`).
@@ -82,6 +86,8 @@ Tune hearing range in `packages/shared/src/constants.ts` (`AUDIO_REF_DIST`, `AUD
 ## E2E smoke scripts
 
 With `pnpm dev` running: `pnpm e2e:characters` / `pnpm e2e:recolor` / `pnpm e2e:perf` (draw calls and triangles, main and shadow pass, at five spots; `pnpm e2e:perf cull=0` for the unculled numbers) (headless Chromium via playwright-core; set `BROWSER_PATH` if Chrome/Brave/Edge aren't in /Applications). Screenshots go to `scripts/e2e/out/`.
+
+The GLBs in `apps/client/public` are meshopt-compressed, with unused character clips stripped and textures kept external (one shared `Textures/colormap.png` per kit, decoded once thanks to `Cache.enabled` in `main.tsx`). After adding or replacing a model, run `node scripts/optimize-models.mjs`; already-compressed files are skipped. If a character needs a clip that was stripped, add it to `CHARACTER_CLIPS` there and re-run on the original from git.
 
 `apps/client/scripts/` has dev tools for the Kenney models (clip motion dump, detected recolor cells), and `hair-thumbs.mjs`, which renders the hairstyle picker's head close-ups into `public/characters/previews/hair-*.png` (with `pnpm dev` running, from `apps/client`).
 
@@ -102,7 +108,7 @@ On join, the server asks Cloudflare for 24 h credentials and sends them to that 
 
 Pushing to `main` runs `.github/workflows/deploy.yml`: typecheck and build, then build two images and push them to GitHub Container Registry, then ask Coolify to redeploy.
 
-- `ghcr.io/<owner>/<repo>/server` (`apps/server/Dockerfile`): the Colyseus server on port 2567 (`PORT` overrides). Set `CF_TURN_KEY_ID` / `CF_TURN_API_TOKEN` on it in Coolify for TURN.
+- `ghcr.io/<owner>/<repo>/server` (`apps/server/Dockerfile`): the Colyseus server on port 2567 (`PORT` overrides), bundled with its dependencies into one file by `apps/server/build.mjs` (esbuild), so the image is plain `node index.mjs` with no `node_modules`. `pnpm --filter @hangout/server build && pnpm --filter @hangout/server start` runs the same bundle locally. Set `CF_TURN_KEY_ID` / `CF_TURN_API_TOKEN` on it in Coolify for TURN.
 - `ghcr.io/<owner>/<repo>/client` (`apps/client/Dockerfile`): the built client on nginx, port 80. `VITE_SERVER_URL` is baked in at build time.
 
 Both images build from the repo root, e.g. `docker build -f apps/client/Dockerfile --build-arg VITE_SERVER_URL=ws://localhost:2567 .`

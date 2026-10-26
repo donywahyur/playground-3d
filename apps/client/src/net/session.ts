@@ -1,8 +1,11 @@
 import { Callbacks, Client, type Room } from "@colyseus/sdk";
+import type { Vector3 } from "three";
 import {
   CLOSE_IDLE,
   COLOR_PARTS,
   FACE_PARTS,
+  encodeMove,
+  fromWire,
   ROOM_NAME,
   sanitizeAppearance,
   type Appearance,
@@ -11,11 +14,12 @@ import {
   type IceServer,
   type MoveMessage,
   type RtcSignalIn,
+  type WirePose,
   type RtcSignalOut,
   type VoiceMessage,
 } from "@hangout/shared";
 import { ICE_WAIT_MS, SERVER_URL, STUN_SERVERS } from "../config";
-import { remotePositions, remoteStates, spawn, type NetPlayer } from "../state/runtime";
+import { activity, remotePositions, remoteStates, spawn } from "../state/runtime";
 import { useGame } from "../state/store";
 import { VoiceMesh } from "../voice/mesh";
 import { getMic, watchSpeaking } from "../voice/mic";
@@ -24,7 +28,7 @@ import { resetClock, syncClock } from "../world/sky/daytime";
 import { watchIdle } from "./idle";
 import { forgetSnapshots, pushSnapshot } from "./interp";
 
-type ServerPlayer = NetPlayer &
+type ServerPlayer = WirePose &
   Appearance & {
     name: string;
     muted: boolean;
@@ -50,6 +54,12 @@ let session: Session | null = null;
 
 export function getSpatial() {
   return session?.spatial ?? null;
+}
+
+/** Voice goes only to players within earshot; call a few times a second with the local position. */
+export function updateVoiceRange(listener: Vector3) {
+  if (!session) return;
+  for (const [id, pos] of remotePositions) session.mesh.setDistance(id, pos.distanceTo(listener));
 }
 
 export async function joinGame(name: string, appearance: Appearance) {
@@ -90,7 +100,11 @@ export async function joinGame(name: string, appearance: Appearance) {
     (id) => spatial.remove(id),
     iceServers,
   );
-  session = { room, mic, spatial, mesh, idle: watchIdle((idle) => room.send("idle", idle)), typing: false };
+  const onIdle = (idle: boolean) => {
+    activity.idle = idle;
+    room.send("idle", idle);
+  };
+  session = { room, mic, spatial, mesh, idle: watchIdle(onIdle), typing: false };
   useGame.getState().set({ selfId: room.sessionId });
   if (import.meta.env.DEV) Object.assign(window, { __hangout: session });
 
@@ -118,7 +132,8 @@ export async function joinGame(name: string, appearance: Appearance) {
     for (const field of UI_FIELDS) cb.listen(p, field, sync);
 
     if (id === room.sessionId) {
-      spawn.set(p.x, p.y, p.z);
+      const at = fromWire(p);
+      spawn.set(at.x, at.y, at.z);
       useGame.getState().set({ phase: "playing" });
     } else {
       remoteStates.set(id, p);
@@ -213,6 +228,7 @@ function teardown() {
   if (!session) return;
   session.stopSpeaking?.();
   session.idle.stop();
+  activity.idle = false;
   session.mesh.destroy();
   session.spatial.destroy();
   session.mic?.getTracks().forEach((t) => t.stop());
@@ -224,7 +240,7 @@ function teardown() {
 }
 
 export function sendMove(msg: MoveMessage) {
-  session?.room.send("move", msg);
+  session?.room.sendBytes("move", encodeMove(msg));
 }
 
 export function sendChat(text: string) {
@@ -243,6 +259,7 @@ export function setTyping(typing: boolean) {
 export function setMuted(muted: boolean) {
   if (!session?.mic) return;
   session.mic.getAudioTracks().forEach((t) => (t.enabled = !muted));
+  session.mesh.setMuted(muted);
   session.room.send("voice", { muted, speaking: false } satisfies VoiceMessage);
   useGame.getState().set({ muted });
 }

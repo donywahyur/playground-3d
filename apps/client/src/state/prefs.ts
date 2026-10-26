@@ -10,6 +10,7 @@ export const PREF = {
   camLock: "hangout:camLock",
   mapNorthUp: "hangout:mapNorthUp",
   joystickFixed: "hangout:joystickFixed",
+  quality: "hangout:quality",
 } as const;
 type PrefKey = (typeof PREF)[keyof typeof PREF];
 

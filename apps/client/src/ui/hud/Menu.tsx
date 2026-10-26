@@ -1,11 +1,20 @@
 import { leaveGame, setVolume } from "../../net/session";
-import { isTouch, useGame } from "../../state/store";
+import { isTouch, useGame, type QualityPref } from "../../state/store";
+
+const QUALITY_LABELS: [QualityPref, string][] = [
+  ["auto", "Auto"],
+  ["low", "Low"],
+  ["high", "High"],
+];
 
 export function Menu() {
   const volume = useGame((s) => s.volume);
   const set = useGame((s) => s.set);
   const joystickFixed = useGame((s) => s.joystickFixed);
   const setJoystickFixed = useGame((s) => s.setJoystickFixed);
+  const qualityPref = useGame((s) => s.qualityPref);
+  const quality = useGame((s) => s.quality);
+  const setQualityPref = useGame((s) => s.setQualityPref);
   const playerCount = useGame((s) => Object.keys(s.players).length);
   const pct = Math.round(volume * 100);
 
@@ -36,6 +45,26 @@ export function Menu() {
           onChange={(e) => setVolume(Number(e.target.value) / 100)}
         />
       </label>
+
+      <div className="menu-row">
+        <span className="menu-label">
+          Graphics {qualityPref === "auto" && <span className="muted">{quality === "low" ? "Low" : "High"}</span>}
+        </span>
+        <div className="segmented three" role="tablist" aria-label="Graphics quality">
+          {QUALITY_LABELS.map(([q, label]) => (
+            <button
+              key={q}
+              type="button"
+              role="tab"
+              aria-selected={qualityPref === q}
+              className={qualityPref === q ? "selected" : ""}
+              onClick={() => setQualityPref(q)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {isTouch && (
         <div className="menu-row">

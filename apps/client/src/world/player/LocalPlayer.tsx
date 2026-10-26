@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
 import {
@@ -11,9 +11,9 @@ import {
 import { MathUtils, Vector3, type Group } from "three";
 import { AUDIO_MAX_DIST, GRAVITY, JUMP_SPEED, MOVE_SEND_HZ, RUN_SPEED, WALK_SPEED, type Anim, type Appearance, type Emote } from "@hangout/shared";
 import { sendMove } from "../../net/session";
-import { joystick, localPose, playerActions, spawn } from "../../state/runtime";
+import { joystick, localPose, playerActions, resumePose, spawn } from "../../state/runtime";
 import { useGame } from "../../state/store";
-import { lerpAngle } from "../math";
+import { lerpAngle, ticker } from "../math";
 import { Avatar, CONTROLLER_OFFSET, FOOT_OFFSET } from "./Avatar";
 import { Controls } from "./controls";
 import { useOrbitInput } from "./orbit";
@@ -54,12 +54,15 @@ export function LocalPlayer({ appearance }: { appearance: Appearance }) {
     };
   }, [world]);
 
+  // Fresh join: the server's spawn. Scene remount (quality change): where the player stood.
+  const [start] = useState(() => ({ pos: (resumePose.pos ?? spawn).clone(), rotY: resumePose.pos ? resumePose.rotY : 0 }));
+  const seatTick = useMemo(() => ticker(5), []);
   const state = useRef({
-    pos: spawn.clone(),
+    pos: start.pos.clone(),
     vy: 0,
     airTime: 0,
     jumping: false,
-    rotY: 0,
+    rotY: start.rotY,
     anim: "idle" as Anim,
     nextSend: 0,
     lastSent: "",
@@ -72,6 +75,7 @@ export function LocalPlayer({ appearance }: { appearance: Appearance }) {
     if (!body.current || !collider.current || !controller) return;
     const dt = Math.min(rawDt, 0.1);
     const s = state.current;
+    resumePose.pos = null;
 
     // Input (keyboard ignored while typing in chat or with the menu open).
     const { chatOpen, menuOpen } = useGame.getState();
@@ -190,11 +194,14 @@ export function LocalPlayer({ appearance }: { appearance: Appearance }) {
     camera.getWorldDirection(localPose.forward);
     localPose.rotY = s.rotY;
 
-    // HUD state: the Sit button shows near a free seat or while seated.
-    const seatNearby = !s.seated && freeSeatNear(s.pos.x, s.pos.z) !== null;
-    const sitting = !!s.seated && !s.seated.leaving;
-    const game = useGame.getState();
-    if (seatNearby !== game.seatNearby || sitting !== game.sitting) game.set({ seatNearby, sitting });
+    // HUD state: the Sit button shows near a free seat or while seated. Scanning every seat against every
+    // player is the costly part, so only a few times a second.
+    if (seatTick(dt)) {
+      const seatNearby = !s.seated && freeSeatNear(s.pos.x, s.pos.z) !== null;
+      const sitting = !!s.seated && !s.seated.leaving;
+      const game = useGame.getState();
+      if (seatNearby !== game.seatNearby || sitting !== game.sitting) game.set({ seatNearby, sitting });
+    }
 
     // Network: throttle, and skip when nothing changed. Advancing a fixed
     // schedule (instead of "time since last send") keeps the average rate at
@@ -218,10 +225,10 @@ export function LocalPlayer({ appearance }: { appearance: Appearance }) {
 
   return (
     <>
-      <RigidBody ref={body} type="kinematicPosition" colliders={false} position={spawn.toArray()}>
+      <RigidBody ref={body} type="kinematicPosition" colliders={false} position={start.pos.toArray()}>
         <CapsuleCollider ref={collider} args={[0.5, 0.35]} />
         <group ref={visual}>
-          <Avatar appearance={appearance} getAnim={() => state.current.anim} />
+          <Avatar appearance={appearance} getAnim={() => state.current.anim} local />
         </group>
         {/* Your own nametag isn't shown, so the bubble sits lower than on others. */}
         <PlayerBubble id={selfId} y={0.95} />

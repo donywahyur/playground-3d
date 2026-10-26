@@ -1,4 +1,4 @@
-import { MOVE_SEND_HZ, PATCH_HZ } from "@hangout/shared";
+import { fromWire, MOVE_SEND_HZ, PATCH_HZ, type WirePose } from "@hangout/shared";
 import { remoteSnapshots, type NetPlayer } from "../state/runtime";
 
 const SEND_MS = 1000 / MOVE_SEND_HZ;
@@ -22,7 +22,7 @@ const OFFSET_SMOOTHING = 0.05;
 const clockOffset = new Map<string, number>();
 
 /** Record a remote player's state after a server patch. */
-export function pushSnapshot(id: string, p: NetPlayer, now: number) {
+export function pushSnapshot(id: string, p: WirePose, now: number) {
   if (!p.t) return; // spawned, no move yet: the live state is drawn as-is (see sampleSnapshots)
   let buf = remoteSnapshots.get(id);
   if (!buf) remoteSnapshots.set(id, (buf = []));
@@ -36,7 +36,7 @@ export function pushSnapshot(id: string, p: NetPlayer, now: number) {
   // earlier so the first step is interpolated over one send interval, not
   // crawled over the whole idle time.
   if (last && p.t - last.t > IDLE_MS) buf.push({ ...last, t: p.t - SEND_MS });
-  buf.push({ x: p.x, y: p.y, z: p.z, rotY: p.rotY, anim: p.anim, t: p.t });
+  buf.push(fromWire(p));
   while (buf.length > 2 && buf[1].t < p.t - KEEP_MS) buf.shift();
 }
 
