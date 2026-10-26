@@ -55,8 +55,10 @@ jobs:
           context: .
           file: apps/${{ matrix.app }}/Dockerfile
           push: true
+          # BUILD_ID lets the join screen notice a half-finished deploy (client and server builds differ).
           build-args: |
             VITE_SERVER_URL=${{ vars.VITE_SERVER_URL }}
+            BUILD_ID=${{ github.sha }}
           tags: |
             ghcr.io/${{ github.repository }}/${{ matrix.app }}:latest
             ghcr.io/${{ github.repository }}/${{ matrix.app }}:${{ github.sha }}

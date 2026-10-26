@@ -9,6 +9,7 @@ import { HomeScene } from "./HomeScene";
 import { LoadingScreen } from "./LoadingScreen";
 import { PatchNotes } from "./PatchNotes";
 import { VERSION } from "./releases";
+import { UPDATING_MESSAGE, useServerStatus } from "./useServerStatus";
 
 function initialAppearance(): Appearance {
   try {
@@ -33,6 +34,7 @@ export function JoinScreen({ onJoin }: { onJoin: (name: string, appearance: Appe
   const stage = useRef<HTMLDivElement>(null);
   const anim = useRef<Anim>("idle");
   const [loaded, setLoaded] = useState(false);
+  const server = useServerStatus();
   const onLoaded = useCallback(() => setLoaded(true), []);
 
   // Wave hello on the main view once it shows; cheer while joining.
@@ -76,7 +78,24 @@ export function JoinScreen({ onJoin }: { onJoin: (name: string, appearance: Appe
                 Name
                 <input value={name} maxLength={NAME_MAX_LEN} placeholder="Your name" onChange={(e) => setName(e.target.value)} />
               </label>
-              <button className="primary" disabled={phase === "connecting"}>
+              {server === "updating" && (
+                <div className="maintenance" role="status">
+                  <strong>🛠 Updating</strong>
+                  <span>{UPDATING_MESSAGE}</span>
+                  {/* This page may be the outdated half: a reload picks up the new client once it's out. */}
+                  <button type="button" className="link" onClick={() => location.reload()}>
+                    Reload page
+                  </button>
+                </div>
+              )}
+              {server === "offline" && (
+                <div className="maintenance" role="status">
+                  <strong>🛠 Server unavailable</strong>
+                  <span>It's restarting or under maintenance. Try again in a minute.</span>
+                </div>
+              )}
+              {/* Joining a mismatched build can't work; offline still lets players try (the check itself may be what failed). */}
+              <button className="primary" disabled={phase === "connecting" || server === "updating"}>
                 {phase === "connecting" ? "Joining…" : "Join with mic"}
               </button>
               <button type="button" className="secondary" onClick={() => setView("customize")}>

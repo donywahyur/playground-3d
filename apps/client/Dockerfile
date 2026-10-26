@@ -12,6 +12,9 @@ RUN pnpm install --frozen-lockfile --filter @hangout/client...
 # Baked into the bundle at build time (public, so never put secrets in VITE_*).
 ARG VITE_SERVER_URL
 RUN test -n "$VITE_SERVER_URL" || (echo "VITE_SERVER_URL build arg is required" && exit 1)
+# Commit SHA from CI; must match the server's, or the join screen shows "Updating" (unset: "dev").
+ARG BUILD_ID
+ENV VITE_BUILD_ID=$BUILD_ID
 RUN pnpm --filter @hangout/client build
 # Compress once at build time at the highest level; nginx serves the .gz files as they are (gzip_static).
 # Meshopt GLBs are laid out to compress well with gzip. PNGs are already compressed.

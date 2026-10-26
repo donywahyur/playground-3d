@@ -12,7 +12,9 @@ RUN pnpm install --frozen-lockfile --filter @hangout/server...
 RUN pnpm --filter @hangout/server build
 
 FROM node:24-alpine
-ENV NODE_ENV=production PORT=2567
+# Commit SHA from CI, served on GET /status; the client compares it with its own (unset: "dev").
+ARG BUILD_ID
+ENV NODE_ENV=production PORT=2567 BUILD_ID=$BUILD_ID
 WORKDIR /app
 COPY --from=build /app/apps/server/dist/index.mjs ./
 EXPOSE 2567

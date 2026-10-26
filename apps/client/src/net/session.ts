@@ -1,6 +1,8 @@
 import { Callbacks, Client, type Room } from "@colyseus/sdk";
+import { UPDATING_MESSAGE } from "../ui/home/useServerStatus";
 import type { Vector3 } from "three";
 import {
+  BUILD_MISMATCH,
   CLOSE_IDLE,
   COLOR_PARTS,
   FACE_PARTS,
@@ -18,7 +20,7 @@ import {
   type RtcSignalOut,
   type VoiceMessage,
 } from "@hangout/shared";
-import { ICE_WAIT_MS, SERVER_URL, STUN_SERVERS } from "../config";
+import { BUILD_ID, ICE_WAIT_MS, SERVER_URL, STUN_SERVERS } from "../config";
 import { activity, remotePositions, remoteStates, spawn } from "../state/runtime";
 import { useGame } from "../state/store";
 import { VoiceMesh } from "../voice/mesh";
@@ -77,11 +79,12 @@ export async function joinGame(name: string, appearance: Appearance) {
   let room: Room;
   try {
     const client = new Client(SERVER_URL);
-    room = await client.joinOrCreate(ROOM_NAME, { name, appearance });
+    room = await client.joinOrCreate(ROOM_NAME, { name, appearance, build: BUILD_ID });
   } catch (err) {
     mic?.getTracks().forEach((t) => t.stop());
     spatial.destroy();
-    game.set({ phase: "join", error: `Could not connect to ${SERVER_URL}` });
+    const updating = err instanceof Error && err.message.includes(BUILD_MISMATCH);
+    game.set({ phase: "join", error: updating ? UPDATING_MESSAGE : `Could not connect to ${SERVER_URL}` });
     console.error(err);
     return;
   }

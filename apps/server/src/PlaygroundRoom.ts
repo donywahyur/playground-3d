@@ -1,5 +1,6 @@
 import { Room, type Client } from "@colyseus/core";
 import {
+  BUILD_MISMATCH,
   CHAT_MAX_LEN,
   CLOSE_IDLE,
   IDLE_AFTER_MS,
@@ -21,6 +22,7 @@ import {
   type VoiceMessage,
 } from "@hangout/shared";
 import { PlaygroundState, Player } from "./state.ts";
+import { BUILD_ID } from "./build.ts";
 import { createIceServers } from "./turn.ts";
 
 // Allow some slack over RUN_SPEED for jitter between move packets.
@@ -133,6 +135,9 @@ export class PlaygroundRoom extends Room<{ state: PlaygroundState }> {
   }
 
   onJoin(client: Client, options?: Partial<JoinOptions>) {
+    // Mid-deploy, client and server can be different builds that don't speak the same protocol.
+    if (BUILD_ID !== "dev" && options?.build !== BUILD_ID) throw new Error(BUILD_MISMATCH);
+
     const name = String(options?.name ?? "").trim().slice(0, NAME_MAX_LEN) || `Guest ${client.sessionId.slice(0, 4)}`;
     const appearance = sanitizeAppearance(options?.appearance);
 

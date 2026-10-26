@@ -4,7 +4,17 @@ import { ANIMS, type Anim } from "./constants.ts";
 export interface JoinOptions {
   name: string;
   appearance: Appearance;
+  /** The client's build (commit SHA, "dev" locally); the server turns away a different build. */
+  build?: string;
 }
+
+/** GET /status on the game server: which build it runs. The join screen compares it with its own. */
+export interface ServerStatus {
+  build: string;
+}
+
+/** Join error when the client and server builds differ, i.e. an update is half deployed. */
+export const BUILD_MISMATCH = "build-mismatch";
 
 /** A player's pose in meters / radians, as the game uses it. */
 export interface MoveMessage {

@@ -113,6 +113,8 @@ Pushing to `main` runs `.github/workflows/deploy.yml`: typecheck and build, then
 
 Both images build from the repo root, e.g. `docker build -f apps/client/Dockerfile --build-arg VITE_SERVER_URL=ws://localhost:2567 .`
 
+**Half-finished deploys.** Client and server deploy separately, and a new client can't talk to an old server (or the other way round) when the protocol changes. CI bakes the commit SHA into both images (`BUILD_ID` build arg). The server reports it on `GET /status` and refuses joins from another build; the join screen polls `/status` every 5 s and shows "Updating" (Join disabled, with a reload link) while the builds differ, or "Server unavailable" while the server doesn't answer. Players in the game when the server restarts are sent back to the join screen. Locally both sides are `dev`, so the check is off. To keep the window short, the Coolify webhook must list **both** UUIDs so they deploy together.
+
 One-time setup:
 
 1. In Coolify, add two resources of type Docker Image: `ghcr.io/<owner>/<repo>/server:latest` and `.../client:latest`, each with its own domain (the server's needs WebSockets, which Coolify's proxy passes through). The images are private by default: either make both packages public on GitHub, or log the Coolify server in to `ghcr.io` with a token that has `read:packages`.

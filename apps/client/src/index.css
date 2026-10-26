@@ -118,6 +118,9 @@ button, input { font: inherit; color: inherit; }
 .home-panel .character-tile, .home-panel .face-tile { background: rgba(74, 47, 31, 0.4); }
 .home-panel .character-tile.selected { background: rgba(63, 154, 95, 0.45); }
 .home.customize .home-panel { align-self: stretch; }
+/* Join screen notice while an update is half deployed or the server is down (ui/home/useServerStatus.ts). */
+.maintenance { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--wood-dark); background: #f5c95b; color: var(--wood-dark); line-height: 1.35; }
+.home-panel .maintenance .link { align-self: flex-start; color: var(--wood-dark); text-decoration: underline; }
 .home-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .home-footer p { margin: 0; }
 .home-footer .link { white-space: nowrap; }
