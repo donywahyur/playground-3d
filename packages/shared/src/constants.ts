@@ -44,6 +44,7 @@ export const dayPhase = (serverMs: number) => (((serverMs % DAY_LENGTH_MS) + DAY
 export const EMOTES = ["wave", "dance", "cheer", "yes", "no"] as const;
 export type Emote = (typeof EMOTES)[number];
 
-export const ANIMS = ["idle", "walk", "run", "jump", "sit", ...EMOTES] as const;
+// New entries go at the end: the wire format sends the index.
+export const ANIMS = ["idle", "walk", "run", "jump", "sit", ...EMOTES, "swim", "tread"] as const;
 export type Anim = (typeof ANIMS)[number];
 export const isAnim = (v: unknown): v is Anim => ANIMS.includes(v as Anim);

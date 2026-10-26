@@ -270,7 +270,8 @@ button, input { font: inherit; color: inherit; }
 }
 .pill.warn { background: rgba(255, 107, 107, 0.85); }
 .pill.active { background: var(--accent); }
-.pill.clock { cursor: default; font-variant-numeric: tabular-nums; }
+.pill.clock,
+.pill.ping { cursor: default; font-variant-numeric: tabular-nums; }
 
 .menu { position: absolute; top: 64px; right: 16px; width: min(280px, calc(100% - 32px)); display: flex; flex-direction: column; gap: 14px; max-height: calc(100% - 80px); overflow-y: auto; }
 .menu-players { overflow-y: auto; }

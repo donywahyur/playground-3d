@@ -13,6 +13,7 @@ import { AUDIO_MAX_DIST, GRAVITY, JUMP_SPEED, MOVE_SEND_HZ, RUN_SPEED, WALK_SPEE
 import { sendMove } from "../../net/session";
 import { joystick, localPose, playerActions, resumePose, spawn } from "../../state/runtime";
 import { useGame } from "../../state/store";
+import { waterDepth } from "../env/layout";
 import { lerpAngle, ticker } from "../math";
 import { Avatar, CONTROLLER_OFFSET, FOOT_OFFSET } from "./Avatar";
 import { Controls } from "./controls";
@@ -24,6 +25,9 @@ type CharacterController = ReturnType<ReturnType<typeof useRapier>["world"]["cre
 
 /** How long each emote plays (s); dance goes on until you move. */
 const EMOTE_TIME: Record<Emote, number> = { wave: 2, dance: Infinity, cheer: 2.4, yes: 1.33, no: 1.33 };
+/** Water deeper than this (m, about chest high) and you swim; a little shallower again and you wade. */
+const SWIM_DEPTH = 0.55;
+const SWIM_HYSTERESIS = 0.1;
 
 const tmpTarget = new Vector3();
 const tmpCam = new Vector3();
@@ -67,6 +71,7 @@ export function LocalPlayer({ appearance }: { appearance: Appearance }) {
     nextSend: 0,
     lastSent: "",
     seated: null as Seated | null,
+    swimming: false,
     emote: null as { name: Emote; until: number } | null,
   });
 
@@ -173,8 +178,10 @@ export function LocalPlayer({ appearance }: { appearance: Appearance }) {
       // A deliberate jump shows the pose immediately; falling only after a short grace
       // period so stepping off small ledges/stairs doesn't flash it.
       const airborne = s.jumping || s.airTime > 0.15;
-      if (moving || airborne || (s.emote && now >= s.emote.until)) s.emote = null;
-      s.anim = airborne ? "jump" : moving ? (running ? "run" : "walk") : (s.emote?.name ?? "idle");
+      const depth = waterDepth(s.pos.x, s.pos.y - FOOT_OFFSET - CONTROLLER_OFFSET);
+      s.swimming = depth > SWIM_DEPTH - (s.swimming ? SWIM_HYSTERESIS : 0);
+      if (moving || airborne || s.swimming || (s.emote && now >= s.emote.until)) s.emote = null;
+      s.anim = airborne ? "jump" : s.swimming ? (moving ? "swim" : "tread") : moving ? (running ? "run" : "walk") : (s.emote?.name ?? "idle");
     }
     if (visual.current) visual.current.rotation.y = s.rotY;
     if (range.current) range.current.position.set(s.pos.x, s.pos.y - FOOT_OFFSET + 0.02, s.pos.z);

@@ -1,18 +1,22 @@
 import { AnimationClip, Euler, Quaternion, QuaternionKeyframeTrack, VectorKeyframeTrack, type KeyframeTrack } from "three";
 
 /**
- * Kenney's Mini Characters ship no wave, dance or cheer, so these are built
- * here as looping clips on the shared 7-bone rig. Every bone's rest rotation is
- * identity, with the arms straight out sideways (T-pose):
+ * Kenney's Mini Characters ship no wave, dance, cheer or swimming, so these are
+ * built here as looping clips on the shared 7-bone rig. Every bone's rest
+ * rotation is identity, with the arms straight out sideways (T-pose):
  *   arm-left (+x side): rotation about z, +90° up, -90° down (idle is -45°)
  *   arm-right (-x side): mirrored, -90° up, +90° down (idle is +45°)
  *   legs: rotation about x, negative swings the leg forward
- * Angles below are in degrees; `root.position` is in model units (~0.78 tall).
+ *   torso, head, root: rotation about x, positive tips forward
+ * Angles below are in degrees; `root.position` is in model units (~0.78 tall:
+ * hips at 0.18, shoulders at 0.29, the head above 0.34).
  */
 
-type Pose = Partial<Record<"torso" | "head" | "arm-left" | "arm-right" | "leg-left" | "leg-right", [number, number, number]>> & {
+type Pose = Partial<Record<"root" | "torso" | "head" | "arm-left" | "arm-right" | "leg-left" | "leg-right", [number, number, number]>> & {
   /** Root height offset (model units). */
   lift?: number;
+  /** Root forward offset (model units). */
+  shift?: number;
 };
 
 const FPS = 24;
@@ -32,14 +36,14 @@ function clipFrom(name: string, duration: number, pose: (phase: number) => Pose)
     // Phase in [0, 1); the last frame repeats the first so the loop is seamless.
     const p = pose((i % frames) / frames);
     for (const [bone, value] of Object.entries(p)) {
-      if (bone === "lift") continue;
+      if (bone === "lift" || bone === "shift") continue;
       const [x, y, z] = value as [number, number, number];
       tmpQ.setFromEuler(tmpE.set(x * D, y * D, z * D));
       let list = rot.get(bone);
       if (!list) rot.set(bone, (list = []));
       list.push(tmpQ.x, tmpQ.y, tmpQ.z, tmpQ.w);
     }
-    lift.push(0, p.lift ?? 0, 0);
+    lift.push(0, p.lift ?? 0, p.shift ?? 0);
   }
   const tracks: KeyframeTrack[] = [...rot].map(([bone, values]) => new QuaternionKeyframeTrack(`${bone}.quaternion`, times, values));
   tracks.push(new VectorKeyframeTrack("root.position", times, lift));
@@ -82,6 +86,35 @@ export function makeEmoteClips(): AnimationClip[] {
         "leg-left": [-15 * Math.max(0, s), 0, 0],
         "leg-right": [-15 * Math.max(0, -s), 0, 0],
         lift: 0.025 * bounce(p),
+      };
+    }),
+    // Front crawl, face down. The clip's origin is the waterline (the model is
+    // floated onto the surface, see CharacterModel): the body lies tipped 70°
+    // forward around mid-chest, just under it, with the big head lifted out.
+    // Each arm windmills forward, down through the water, back and over the
+    // top (about x after pointing it up), half a stroke apart; legs flutter.
+    clipFrom("swim", 1.4, (p) => ({
+      root: [70, 10 * wave(p), 0],
+      head: [-60, -8 * wave(p), 0],
+      "arm-left": [360 * p, 0, 90],
+      "arm-right": [360 * p + 180, 0, -90],
+      "leg-left": [20 * wave(p * 3), 0, 0],
+      "leg-right": [-20 * wave(p * 3), 0, 0],
+      lift: -0.09 + 0.008 * wave(p * 2),
+      shift: -0.235,
+    })),
+    // Treading water: upright with the shoulders at the surface, arms sculling
+    // just under it and legs pedalling, bobbing on each sweep.
+    clipFrom("tread", 2, (p) => {
+      const s = wave(p * 2);
+      return {
+        root: [12, 0, 0],
+        head: [-8, 0, 0],
+        "arm-left": [0, 35 * s, -55],
+        "arm-right": [0, -35 * s, 55],
+        "leg-left": [-25 + 25 * s, 0, 0],
+        "leg-right": [-25 - 25 * s, 0, 0],
+        lift: -0.26 + 0.012 * s,
       };
     }),
   ];

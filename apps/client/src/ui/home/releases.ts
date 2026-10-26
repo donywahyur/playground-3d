@@ -12,6 +12,15 @@ export interface PatchNote {
 
 export const PATCH_NOTES: PatchNote[] = [
   {
+    version: "0.3.0",
+    date: "2026-10-26",
+    title: "Swimming",
+    changes: [
+      "Wade out past the beach and you swim: front crawl on the move, treading water when you stop.",
+      "Your ping to the server shows next to the clock, in red when the connection is slow.",
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-10-26",
     title: "Lighter and smoother",

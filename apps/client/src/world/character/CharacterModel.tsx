@@ -6,6 +6,7 @@ import {
   AnimationMixer,
   Frustum,
   LoopOnce,
+  MathUtils,
   Matrix4,
   QuaternionKeyframeTrack,
   Skeleton,
@@ -21,6 +22,7 @@ import {
   type SkinnedMesh,
 } from "three";
 import { useGame } from "../../state/store";
+import { WATER_Y } from "../env/layout";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { GRAVITY, JUMP_SPEED, type Anim, type Appearance } from "@hangout/shared";
 import { modelUrl } from "./catalog";
@@ -36,7 +38,7 @@ const JUMP_AIR_TIME = (2 * JUMP_SPEED) / GRAVITY;
 const BLINK_TIME = 0.12;
 const BLINK_GAP = 2.5;
 
-type Clip = "idle" | "walk" | "sprint" | "jump" | "jump-mirror" | "fall" | "sit" | "wave" | "dance" | "cheer" | "emote-yes" | "emote-no";
+type Clip = "idle" | "walk" | "sprint" | "jump" | "jump-mirror" | "fall" | "sit" | "wave" | "dance" | "cheer" | "emote-yes" | "emote-no" | "swim" | "tread";
 const CLIP: Record<Anim, Clip> = {
   idle: "idle",
   walk: "walk",
@@ -48,6 +50,8 @@ const CLIP: Record<Anim, Clip> = {
   cheer: "cheer",
   yes: "emote-yes",
   no: "emote-no",
+  swim: "swim",
+  tread: "tread",
 };
 // Kenney's jump clip is 0.5s; stretch it over our hop's air time.
 const TIME_SCALE: Partial<Record<Clip, number>> = { walk: 1.6, sprint: 1.2, jump: 0.5 / JUMP_AIR_TIME, "jump-mirror": 0.5 / JUMP_AIR_TIME };
@@ -170,7 +174,7 @@ function Model({ appearance, getAnim, local = false }: Props) {
     }
   }, [actions]);
 
-  const state = useRef({ clip: null as Clip | null, airT: 0, lastY: NaN, rising: false, hops: 0, blinkAt: 0, eyesClosed: false, mixerDt: 0 });
+  const state = useRef({ clip: null as Clip | null, airT: 0, lastY: NaN, rising: false, hops: 0, blinkAt: 0, eyesClosed: false, mixerDt: 0, float: 0 });
 
   useFrame(({ clock, camera }, rawDt) => {
     if (!root.current) return;
@@ -202,7 +206,8 @@ function Model({ appearance, getAnim, local = false }: Props) {
 
     // Detect each takeoff from vertical speed so a held jump (bunny-hopping)
     // replays the jump clip every hop, for local and remote players alike.
-    const y = pos.y;
+    // Feet height, without the swim float.
+    const y = pos.y - s.float;
     const rising = Number.isFinite(s.lastY) && (y - s.lastY) / dt > 1;
     const takeoff = anim === "jump" && rising && !s.rising;
     s.lastY = y;
@@ -215,6 +220,12 @@ function Model({ appearance, getAnim, local = false }: Props) {
     // Each hop alternates the leading leg via the mirrored jump.
     let clip: Clip = anim === "jump" && s.airT > JUMP_AIR_TIME + 0.1 ? "fall" : CLIP[anim];
     if (clip === "jump" && s.hops % 2 === 1) clip = "jump-mirror";
+
+    // Swim clips are posed around the waterline; float the model up off the sea floor onto the surface.
+    const swimming = clip === "swim" || clip === "tread";
+    s.float = MathUtils.damp(s.float, swimming ? Math.max(0, WATER_Y - y) : 0, 8, dt);
+    root.current.position.y = s.float;
+
     if (clip === s.clip && !takeoff) return;
 
     const next = actions[clip];

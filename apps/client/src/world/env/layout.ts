@@ -44,6 +44,8 @@ export const SHORE_X = 66;
 /** Sloped beach from SHORE_X down to the sea floor. */
 export const SEA_FLOOR = { x: 72, y: -1.4 };
 export const WATER_Y = -0.45;
+/** How deep (m) something at height y stands in the sea; 0 on land or above the surface. */
+export const waterDepth = (x: number, y: number) => (x > SHORE_X - 2 ? Math.max(0, WATER_Y - y) : 0);
 export const BEACH: Rect = { x0: BEACH_X, x1: HALF, z0: -38, z1: 38 };
 export const WEST_CLEARING = { x: -62, z: 0, r: 9 };
 

@@ -8,6 +8,7 @@ import { Actions } from "./Actions";
 import { Chat } from "./Chat";
 import { Menu } from "./Menu";
 import { Minimap, WorldMap } from "./Minimap";
+import { Ping } from "./Ping";
 import { PlayerList, PlayersPopup } from "./PlayerList";
 
 function toggleCamLock() {
@@ -72,6 +73,7 @@ export function Hud() {
 
       <div className="toolbar">
         <Clock />
+        <Ping />
         {mic === "denied" ? (
           <button
             className="pill warn"

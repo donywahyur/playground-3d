@@ -246,6 +246,11 @@ export function sendMove(msg: MoveMessage) {
   session?.room.sendBytes("move", encodeMove(msg));
 }
 
+/** Measure the round trip to the server (ms); `onPong` never runs while disconnected. */
+export function pingServer(onPong: (ms: number) => void) {
+  session?.room.ping(onPong);
+}
+
 export function sendChat(text: string) {
   session?.room.send("chat", text);
   // The server clears typing when the line arrives.
