@@ -111,4 +111,4 @@ One-time setup:
 
 1. In Coolify, add two resources of type Docker Image: `ghcr.io/<owner>/<repo>/server:latest` and `.../client:latest`, each with its own domain (the server's needs WebSockets, which Coolify's proxy passes through). The images are private by default: either make both packages public on GitHub, or log the Coolify server in to `ghcr.io` with a token that has `read:packages`.
 2. In Coolify, create an API token with deploy permission, and copy the deploy webhook URL (`.../api/v1/deploy?uuid=<server uuid>,<client uuid>`).
-3. In the GitHub repo, Settings > Secrets and variables > Actions: variable `VITE_SERVER_URL` (`wss://<server domain>`), secrets `COOLIFY_WEBHOOK` and `COOLIFY_TOKEN`.
+3. In the GitHub repo, Settings > Environments, create environment `COOLIFY` with variable `VITE_SERVER_URL` (`wss://<server domain>`) and secrets `COOLIFY_WEBHOOK` and `COOLIFY_TOKEN`.

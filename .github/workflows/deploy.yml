@@ -1,7 +1,7 @@
 # On every push to main: typecheck and build, push the server and client images
 # to GitHub Container Registry, then have Coolify redeploy both.
 #
-# Repo settings (Settings > Secrets and variables > Actions):
+# GitHub environment COOLIFY (Settings > Environments), used by the images and deploy jobs:
 #   variable VITE_SERVER_URL  wss:// URL of the server, baked into the client bundle
 #   secret   COOLIFY_WEBHOOK  deploy webhook URL from Coolify (both resources: ...deploy?uuid=<server>,<client>)
 #   secret   COOLIFY_TOKEN    Coolify API token with deploy permission
@@ -35,6 +35,7 @@ jobs:
   images:
     needs: check
     runs-on: ubuntu-latest
+    environment: COOLIFY
     permissions:
       contents: read
       packages: write
@@ -65,6 +66,7 @@ jobs:
   deploy:
     needs: images
     runs-on: ubuntu-latest
+    environment: COOLIFY
     steps:
       - name: Trigger Coolify
         env:
